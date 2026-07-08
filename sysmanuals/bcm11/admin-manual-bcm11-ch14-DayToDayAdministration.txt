@@ -1,0 +1,3007 @@
+
+                                                                                    14
+                   Day-to-day Administration
+Just as for regular Linux system administration, it is a best practice for cluster administration procedures
+to be documented as they are carried out.
+    Updating software packages for bug fixes or for security fixes is a substantial and important part of
+the tasks carried out in daily cluster administration. It has its own chapter (Chapter 9).
+    This chapter discusses other tasks that may come up in day-to-day cluster administration with
+NVIDIA Base Command Manager.
+    Section 14.1 discusses running shell commands in parallel over the cluster.
+    Section 14.2 discusses how a cluster administrator can ask the help of the BCM support team for
+guidance with an issue in an optimum manner.
+    Section 14.3 discusses how backups can be implemented for BCM.
+    Section 14.4 discusses revision control for images.
+    Section 14.5 discusses BIOS configuration with BCM.
+    Section 14.6 discusses checking hardware matching across the nodes of the cluster.
+    Section 14.7 discusses Serial Over LAN console access.
+    Section 14.8 discusses administrative aspects of handling the large amounts of raw monitoring data.
+    Section 14.9 discusses node replacement.
+    Section 14.10 discusses using Ansible to configure the cluster via Ansible collections and playbooks.
+
+
+14.1    Parallel Shells: pdsh And pexec
+What pdsh And pexec Do
+The cluster management tools include two parallel shell execution commands:
+
+   • pdsh (parallel distributed shell, section 14.1.1), runs from within the OS shell. That is, pdsh exe-
+     cutes its commands from within bash by default.
+
+   • pexec (parallel execute, section 14.1.2, runs from within CMDaemon. That is, pexec executes its
+     commands from within the cmsh front end.
+
+   A one-time execution of pdsh or pexec can run one or more shell commands on a group of nodes in
+parallel.
+
+A Warning About Power Surge Risks With pdsh And pexec
+Some care is needed when running pdsh or pexec with commands that affect power consumption. For
+example, running commands that power-cycle devices in parallel over a large number of nodes can be
+risky because it can put unacceptable surge demands on the power supplies.
+    Within cmsh, executing a power reset command from device mode to power cycle a large group of
+nodes is much safer than running a parallel command to do a reset using pdsh or pexec. This is because
+the CMDaemon power reset powers up nodes after a deliberate delay between nodes (section 4.2).
+708                                                                          Day-to-day Administration
+
+Which Command To Use Out Of pdsh And pexec
+The choice of using pdsh or pexec commands is mostly up to the administrator. The only time that run-
+ning pdsh from bash is currently required instead of running pexec from within cmsh, is when stopping
+and restarting CMDaemon on a large number of regular nodes (section 2.6.1). This is because a com-
+mand to stop CMDaemon on a regular node, that itself relies on being run from a running CMDaemon
+on a regular node, can obviously give unexpected results.
+
+14.1.1 pdsh In The OS Shell
+Packages Required For pdsh
+By default, the following packages must be installed from the BCM repositories to the head node for
+pdsh to function fully:
+
+   • pdsh
+
+   • genders
+
+   • pdsh-mod-cmupdown
+
+   • pdsh-mod-genders
+
+   • pdsh-rcmd-exec
+
+   • pdsh-ssh
+
+     The pdsh utility is modular, that is, it gets extra functionality through the addition of modules.
+     The genders package is used to generate a default /etc/genders configuration file. The file is used to
+decide what and how nodes are to be used or excluded by default, when used with pdsh. Configuration
+details can be found in man pdsh(1). The configuration can probably best be understood by viewing
+the file itself and noting that BCM in the default configuration associates the following genders with a
+list of nodes:
+
+   • all: all the nodes in the cluster, head and regular nodes.
+
+   • category=default: the nodes that are in the default category
+
+   • computenode: regular nodes
+
+   • headnode: node or nodes that are head nodes.
+
+     In a newly-installed cluster using default settings, the genders category=default and computenode
+have the same list of nodes to begin with.
+     The default /etc/genders file has a section that is generated and maintained by CMDaemon, but
+the file can be altered by the administrator outside the CMDaemon-maintained section. However, it is
+not recommended to change the file manually frequently. For example, tracking node states with this
+file is not recommended. Instead, the package pdsh-mod-cmupdown provides the -v option for node state
+tracking functionality, and how to use this and other pdsh options is described in the next section.
+
+pdsh Options
+In the OS shell, running pdsh -h displays the following help text:
+
+Usage: pdsh [-options] command ...
+-S                return largest of remote command return values
+-h                output usage menu and quit
+-V                output version information and quit
+-q                list the option settings and quit
+-b                disable ^C status feature (batch mode)
+-d                enable extra debug information from ^C status
+14.1 Parallel Shells: pdsh And pexec                                                                   709
+
+-l user           execute remote commands as user
+-t seconds        set connect timeout (default is 10 sec)
+-u seconds        set command timeout (no default)
+-f n              use fanout of n nodes
+-w host,host,... set target node list on command line
+-x host,host,... set node exclusion list on command line
+-R name           set rcmd module to name
+-M name,...       select one or more misc modules to initialize first
+-N                disable hostname: labels on output lines
+-L                list info on all loaded modules and exit
+-v                exclude targets if they are down
+-g query,...      target nodes using genders query
+-X query,...      exclude nodes using genders query
+-F file           use alternate genders file `file'
+-i                request alternate or canonical hostnames if applicable
+-a                target all nodes except those with "pdsh_all_skip" attribute
+-A                target all nodes listed in genders database
+available rcmd modules: ssh,exec (default: ssh)
+
+   Further options and details are given in man pdsh(1).
+
+Examples Of pdsh Use
+For the examples in this section, a cluster can be considered that is set up with two nodes, with the state
+of node001 being UP and that of node002 being DOWN:
+[root@basecm11 ~]# cmsh -c "device status"
+node001 .................. [   UP ]
+node002 .................. [ DOWN ]
+basecm11 ................. [   UP ]
+
+   In the examples, the outputs for pdsh could be as follows for the pdsh options considered:
+
+-A: With this pdsh option an attempt is made to run the command on all nodes, regardless of the node
+state:
+Example
+[root@basecm11 ~]# pdsh -A hostname
+node001: node001
+node002: ssh: connect to host node002 port 22: No route to host
+pdsh@basecm11: node002: ssh exited with exit code 255
+basecm11: basecm11
+
+-v: With this option an attempt is made to run the command only on nodes nodes that are in the state
+UP:
+Example
+[root@basecm11 ~]# pdsh -A -v hostname
+node001: node001
+basecm11: basecm11
+
+-g: With this option, and using, for example, computenode as the genders query, only nodes within
+computenode in the /etc/genders file are considered for the command. The -v option then further
+ensures that the command runs only on a node in computenode that is up. In a newly-installed cluster,
+regular nodes are assigned to computenode by default, so the command runs on all regular nodes that
+are up in a newly-installed cluster:
+710                                                                         Day-to-day Administration
+
+Example
+
+[root@basecm11 ~]# pdsh -v -g computenode hostname
+node001: node001
+
+-w:   This option allows a node list (man pdsh(1)) to be specified on the command line itself:
+
+Example
+
+[root@basecm11 ~]# pdsh -w node00[1-2] hostname
+node001: node001
+node002: ssh: connect to host node002 port 22: No route to host
+pdsh@basecm11: node002: ssh exited with exit code 255
+
+-x: This option is the converse of -w, and excludes a node list that is specified on the command line
+itself:
+
+Example
+
+[root@basecm11 ~]# pdsh -x node002 -w node00[1-2] hostname
+node001: node001
+
+The dshbak Command
+The dshbak (distributed shell backend formatting filter) command is a filter that reformats pdsh output.
+It comes with the pdsh package.
+    Running dshbak with the -h option displays:
+
+[root@basecm11 ~]# dshbak -h
+Usage: dshbak [OPTION]...
+ -h       Display this help message
+ -c       Coalesce identical output from hosts
+ -d DIR Send output to files in DIR, one file per host
+ -f       With -d, force creation of DIR
+
+Further details can be found in man dshbak(1).
+   For the examples in this section, it is assumed that all the nodes in the cluster are now up. That is,
+node002 used in the examples of the preceding section is now also up. Some examples to illustrate how
+dshbak works are then the following:
+
+Without dshbak:
+
+Example
+
+[root@basecm11 ~]# pdsh -A ls /etc/services /etc/yp.conf
+basecm11: /etc/services
+basecm11: /etc/yp.conf
+node001: /etc/services
+node001: ls: cannot access /etc/yp.conf: No such file or directory
+pdsh@basecm11: node001: ssh exited with exit code 2
+node002: /etc/services
+node002: /etc/yp.conf
+14.1 Parallel Shells: pdsh And pexec                                                             711
+
+With dshbak, with no dshbak options:
+
+Example
+
+[root@basecm11 ~]# pdsh -A ls /etc/services /etc/yp.conf | dshbak
+node001: ls: cannot access /etc/yp.conf: No such file or directory
+pdsh@basecm11: node001: ssh exited with exit code 2
+----------------
+basecm11
+----------------
+/etc/services
+/etc/yp.conf
+----------------
+node001
+----------------
+/etc/services
+----------------
+node002
+----------------
+/etc/services
+/etc/yp.conf
+[root@basecm11 ~]#
+
+With dshbak, with the -c (coalesce) option:
+
+Example
+
+[root@basecm11 ~]# pdsh -A ls /etc/services /etc/yp.conf | dshbak -c
+node001: ls: cannot access /etc/yp.conf: No such file or directory
+pdsh@basecm11: node001: ssh exited with exit code 2
+----------------
+node002,basecm11
+----------------
+/etc/services
+/etc/yp.conf
+----------------
+node001
+----------------
+/etc/services
+[root@basecm11 ~]#
+
+   The dshbak utility is useful for creating human-friendly output in clusters with larger numbers of
+nodes.
+
+14.1.2 pexec In cmsh
+In cmsh, the pexec command is run from device mode:
+
+Example
+
+[basecm11->device]% pexec -n node001,node002 "cd ; ls"
+
+[node001] :
+anaconda-ks.cfg
+install.log
+install.log.syslog
+712                                                                          Day-to-day Administration
+
+[node002] :
+anaconda-ks.cfg
+install.log
+install.log.syslog
+
+
+14.1.3 pexec In Base View
+In Base View, pexec is hidden, but executed in a GUI wrapper, using the navigation path Cluster > Run
+command.
+    For large numbers of nodes, rendering the output into the node subpanes (little boxes) can take a
+long time. To improve the Base View experience, selecting the Single text view icon instead of the
+Grouped view icon speeds up the rendering significantly, but at the cost of removing the borders of the
+subpanes.
+    Ticking the Join output checkbox places output that is the same for particular nodes, into the same
+subpane.
+    Running parallel shell commands from cmsh instead of in Base View is faster in most cases, due to
+less graphics rendering overhead.
+
+14.1.4 Using The -j|--join Option Of pexec In cmsh
+The output of the pexec command by default can come out in a sequence depending on node response
+time. To make it more useful for an administrator, order can be imposed on the output. Checking
+consistency across nodes is then easier.
+    For example, in a cluster with 2 nodes, the /etc/resolv.conf files for each node could be displayed
+as:
+
+Example
+
+[basecm11->device]% pexec -c default "cat /etc/resolv.conf"
+
+[node001] :
+# This file was generated by the Node Installer.
+search cm.cluster eth.cluster brightcomputing.com
+nameserver 10.141.255.254
+
+[node002] :
+# This file was generated by the Node Installer.
+search cm.cluster eth.cluster brightcomputing.com
+nameserver 10.141.255.254
+
+   More order can be imposed on the preceding output by using the -j|--join option. This joins
+identical fields together in a way similar to the standard unix text utility, join, which makes the result
+easier to view:
+
+Example
+
+[basecm11->device]% pexec -j -c default "cat /etc/resolv.conf"
+[node001,node002]
+# This file was generated by the Node Installer.
+search cm.cluster eth.cluster brightcomputing.com
+nameserver 10.141.255.254
+
+   In the following example, a cluster with 10 nodes is inspected. In the cluster, node002 is down, and
+the idea is to see if the remaining nodes have the same mounts:
+
+Example
+14.2 Getting Support With BCM Issues, And Notifications For Release Updates                   713
+
+[basecm11->device]% pexec -j -c default "mount|sort"
+Nodes down:         node002
+[node002]
+Node down
+
+[node001,node003..node010]
+/dev/hda1 on / type ext3 (rw,noatime,nodiratime)
+/dev/hda2 on /var type ext3 (rw,noatime,nodiratime)
+/dev/hda3 on /tmp type ext3 (rw,nosuid,nodev,noatime,nodiratime)
+/dev/hda6 on /local type ext3 (rw,noatime,nodiratime)
+master:/cm/shared on /cm/shared type nfs
+(rw,rsize=32768,wsize=32768,hard,intr,addr=10.141.255.254)
+master:/home on /home type nfs
+(rw,rsize=32768,wsize=32768,hard,intr,addr=10.141.255.254)
+none on /dev/pts type devpts (rw,gid=5,mode=620)
+none on /dev/shm type tmpfs (rw)
+none on /proc/sys/fs/binfmt_misc type binfmt_misc (rw)
+none on /proc type proc (rw,nosuid)
+none on /sys type sysfs (rw)
+
+   Here, even more order is imposed by sorting the output of each mount command within bash before
+the -j option operates from cmsh. The -c option executes the command on the default category of
+nodes.
+
+14.1.5 Other Parallel Commands
+Besides pexec, CMDaemon has several other parallel commands:
+
+pkill: parallel kill
+Synopsis:
+pkill [OPTIONS] <tracker> [<tracker> . . . ]
+
+plist: List the parallel commands that are currently running, with their tracker ID
+Synopsis:
+plist
+
+pping: ping nodes in parallel
+Synopsis:
+pping [OPTIONS]
+
+pwait: wait for parallel commands that are running to complete
+Synopsis:
+pwait [OPTIONS] <tracker> [<tracker> . . . ]
+
+  Details on these parallel commands, including examples, can be seen by executing the help com-
+mand within the device mode of cmsh for a parallel command, <pcommand>, as follows:
+
+   [basecm11->device]%help <pcommand>
+
+
+14.2     Getting Support With BCM Issues, And Notifications For Release
+         Updates
+The scope of BCM technical support is described in Appendix D of the Installation Manual.
+714                                                                       Day-to-day Administration
+
+14.2.1 The Support Portal For BCM
+Support requests can be sent in via the support portal at
+   https://enterprise-support.nvidia.com/s/create-case
+
+
+
+
+                   Figure 14.1: Customer support portal: submitting a support request
+
+      When creating a BCM support case at that URL:
+
+  • the Product Type that must be selected is Software.
+
+  • the Product Category that must be selected is:
+
+          – Bright Cluster Manager for issues related to versions of BCM prior to BCM version 10.
+          – Base Command Manager for issues related to BCM version 10 and beyond.
+
+  • Registered users are advised to log in to the support portal. It makes the user experience better
+    because cluster-related data values are already filled in for a logged-in user.
+
+  • Unregistered users can also create a case via the same URL, to deal with registration issues.
+14.2 Getting Support With BCM Issues, And Notifications For Release Updates                          715
+
+   The Enterprise Support Portal User Guide at
+
+   https://enterprise-support.nvidia.com/s/article/NVIDIA-Enterprise-Support-Guide-for-New-Users
+
+   has further details on how users can submit support requests.
+
+    BCM support as implemented via the support portal is carried out primarily via e-mail. As a sup-
+plement to that, the cm-diagnose (section 14.2.2) and the request-remote-assistance (section 14.2.3)
+utilities are provided to help resolve issues. These are discussed next.
+
+14.2.2 Reporting Cluster Manager Diagnostics With cm-diagnose
+The diagnostic utility cm-diagnose is run from the head node. It gathers data on the cluster that may
+help diagnose issues. Running it as
+    cm-diagnose --help
+    displays its options, capabilities, and defaults.
+    For particular issues it may be helpful to change some of the default values to gather data in a more
+targeted way. For example, for larger clusters, the log file limit and the timeout values can both be
+increased to avoid logs being cropped and commands being killed during the gathering of diagnostic
+data:
+
+Example
+
+[root@basecm11 ~]# cm-diagnose --limit 100 --timeout 240
+
+   The preceding command increases the log limit from its default of 50MB to 100MB, and the timeout
+value from its default of 60s to 240s.
+   When carrying out a run to pick up diagnostic data, cm-diagnose runs interactively by default.
+The administrator can send the resultant diagnostics file to BCM support directly. The output of a
+cm-diagnose session looks something like the following (the output has been made less verbose for
+easy viewing):
+
+Example
+
+[root@basecm11 ~]# cm-diagnose
+To be able to contact you about the issue, please provide
+your e-mail address (or support ticket number, if applicable):
+franknfurter@example.com
+
+Please enter the related Support Request (SR) or NVIDIA Enterprise Support number and any other
+related additional information: [SR-XXXXX] or [XXXXXXXX]
+End input with ctrl-d
+This has to do with SR-999999 that I submitted just now. In short:
+I tried X, Y, and Z on the S2464 motherboard. When that didn't work, I
+tried A, B, and C, but the florbish is grommicking.
+Thank you.
+
+Support Request number: SR-999999
+Thank you.
+If issues are suspected in the cmdaemon process, a gdb trace of that process
+is useful. In general such trace is only needed if Bright Support asks for this.
+Do you want to create a gdb trace of the running CMDaemon? [y/N]
+
+Proceed to collect information? [Y/n]
+
+Processing master
+716                                                                           Day-to-day Administration
+
+      Processing commands
+          /bin/uname -a
+          /usr/bin/top -b -n 1
+          /sbin/ifconfig -a
+          ...
+      Processing file contents
+          ...
+      Processing large files and log files
+          ...
+      Collecting process information for CMDaemon
+          gdb -p 1334
+      Executing CMSH commands
+          ...
+      Finished executing CMSH commands
+
+Processing default-image
+    Processing commands
+        ...
+    Processing file contents
+        ...
+Creating log file: /root/SR-999999-basecm11__1234.tar.gz
+
+Cleaning up
+
+Automatically submit diagnostics file to http://support.brightcomputing.com/cm-diagnose/ ? [Y/n]
+
+Uploaded file: SR-999999-basecm11__1234.tar.gz
+Remove log file (/root/SR-999999-basecm11__1234.tar.gz)?        [y/N] y
+[root@basecm11 ~]#
+
+14.2.3 Requesting Remote Support With request-remote-assistance
+The life-cycle of solving a ticket begins with opening a ticket via the support portal (section 14.2.1), and
+then establishing that both the cluster administrator and the support engineer have a basic grasp of the
+issue at hand. This is best done via an e-mail exchange.
+    From this stage onward there are many possible paths. The support engineer may offer a solution,
+or ask for more details, or may ask for some tests to be run. Most of the time, e-mail remains the most
+efficient way to troubleshoot an issue.
+    However at times it may be more appropriate for the cluster administrator to allow remote support
+from the BCM support engineer in order to resolve the issue. The support engineer may in that case
+suggest that the request-remote-assistance utility be run.
+    The request-remote-assistance utility allows a BCM engineer to securely tunnel into the cluster,
+often without a change in firewall or ssh settings of the cluster.
+    With request-remote-assistance:
+
+   • It must be allowed to access the www and ssh ports of the internet servers used by BCM support.
+
+   • For some problems, the engineer may wish to power cycle a node. In that case, indicating what
+     node the engineer can power cycle should be added to the option for entering additional informa-
+     tion.
+
+   • Administrators familiar with screen may wish to run it within a screen session and detach it so
+     that they can resume the session from another machine. A very short reminder of the basics of
+     how to run a screen session is:
+
+         – run the screen command to open the screen session
+14.2 Getting Support With BCM Issues, And Notifications For Release Updates                             717
+
+        – run the request-remote-assistance command within the screen session
+        – ctrl-a d to detach the session (session remains open)
+        – screen -r to resume the session
+        – exit to exit (closes the session)
+
+   The request-remote-assistance command itself is run as follows:
+Example
+[root@basecm11 ~]# request-remote-assistance
+
+This tool helps securely set up a temporary ssh tunnel to
+sandbox.brightcomputing.com.
+
+Allow an NVIDIA engineer ssh access to the cluster? [Y/n]
+This tool uses ICMP ping. Skip ping if your firewall does not allow it? [y/N]
+
+Please enter the related Support Request (SR) or NVIDIA Enterprise Support number and any other related
+additional information: [SR-XXXXX] or [XXXXXXXX]
+End input with ctrl-d
+SR-1234567 - the florbish is grommicking
+
+Thank you.
+
+Added temporary NVIDIA public key.
+
+
+    After the administrator has responded to the ...additional information... entry, and has typed
+in the ctrl-d, the utility tries to establish the connection. The screen clears, and the secure tunnel opens
+up, displaying the following notice:
+REMOTE ASSISTANCE REQUEST
+########################################################
+A connection has been opened to Bright Computing Support.
+Closing this window will terminate the remote assistance
+session.
+--------------------------------------------------------
+
+Hostname: basecm11.NOFQDN
+Connected on port: 7000
+
+ctrl-c to terminate this session
+
+BCM support automatically receives an e-mail alert that an engineer can now securely tunnel into the
+cluster. The session activity is not explicitly visible to the administrator. Whether an engineer is logged
+in can be viewed with the w command, which shows a user running the ssh tunnel, and—if the engi-
+neer is logged in—another user session, along with whatever other sessions the administrator may be
+running:
+Example
+[root@basecm11 ~]# w
+ 13:35:00 up 97 days, 17 min, 2 users, load average: 0.28, 0.50, 0.52
+USER TTY FROM               LOGIN@ IDLE JCPU PCPU WHAT
+root pts/0 10.2.37.101      12:24   1:10m 0.14s 0.05s ssh -q -R :7013:127.0.0.1:22\
+ remote@sandbox.brightcomputing.com basecm11
+root pts/1 localhost.locald 12:54 4.00s 0.03s 0.03s -bash
+718                                                                           Day-to-day Administration
+
+   When the engineer has ended the session, the administrator may remove the secure tunnel with a
+ctrl-c, and the display then shows:
+Tunnel to sandbox.brightcomputing.com terminated.
+Removed temporary NVIDIA public key.
+[root@basecm11 ~]#
+
+    The BCM engineer is then no longer able to access the cluster.
+    The preceding tunnel termination output may also show up automatically, without a ctrl-c from
+the administrator, within seconds after the connection session starts. In that case, it typically means that
+a firewall is blocking access to SSH and WWW to BCM’s internet servers.
+
+14.2.4 Getting Notified About Updates
+Updates for the various NVIDIA Base Command Manager releases continue for some time after the
+initial release is made public. The updates typically have bugfixes and improvements, and an adminis-
+trator may wish to install an update when it becomes publicly available.
+    The release notes for BCM can be found online at:
+    https://docs.nvidia.com/base-command-manager/#release-notes
+
+14.3     Backups
+14.3.1 Cluster Installation Backup
+BCM does not include facilities to create backups of a cluster installation. The cluster administrator is
+responsible for deciding on the best way to back up the cluster, out of the many possible choices.
+     A backup method is strongly recommended, and checking that restoration from backup actually
+works is also strongly recommended.
+     One option that may be appropriate for some cases is simply cloning the head node. A clone can be
+created by PXE booting the new head node, and following the procedure in section 15.4.8.
+     When setting up a backup mechanism, it is recommended that the full filesystem of the head node
+(i.e. including all software images) is backed up. Unless the regular node hard drives are used to store
+important data, it is not necessary to back them up.
+     If no backup infrastructure is already in place at the cluster site, the following open source (GPL)
+software packages may be used to maintain regular backups:
+
+   • Bacula: Bacula is a mature network based backup program that can be used to backup to a remote
+     storage location. If desired, it is also possible to use Bacula on nodes to back up relevant data that
+     is stored on the local hard drives. More information is available at http://www.bacula.org
+       Bacula requires ports 9101-9103 to be accessible on the head node. Including the following lines
+       in the Shorewall rules file for the head node allows access via those ports from an IP address of
+       93.184.216.34 on the external network:
+
+       Example
+
+       ACCEPT   net:93.184.216.34      fw       tcp      9101
+       ACCEPT   net:93.184.216.34      fw       tcp      9102
+       ACCEPT   net:93.184.216.34      fw       tcp      9103
+
+       The Shorewall service should then be restarted to enforce the added rules.
+
+   • rsnapshot: rsnapshot allows periodic incremental filesystem snapshots to be written to a local
+     or remote filesystem. Despite its simplicity, it can be a very effective tool to maintain frequent
+     backups of a system. More information is available at http://www.rsnapshot.org.
+       Rsnapshot requires access to port 22 on the head node.
+14.3 Backups                                                                                             719
+
+14.3.2 Local Database And Data Backups And Restoration
+The CMDaemon database is stored in the MySQL cmdaemon database, and contains most of the stored
+settings of the cluster.
+     Monitoring data values are stored as binaries in the filesystem, under /var/spool/cmd/monitoring.
+     The administrator is expected to run a regular backup mechanism for the cluster to allow restores of
+all files from a recent snapshot. As an additional, separate, convenience:
+
+   • For the CMDaemon database:
+
+        – the entire database is, by default, also backed up nightly on the cluster filesystem itself (“local
+          rotating backup”) for the last 7 days:
+          Example
+          [root@basecm11 ~]# ls -1t /var/spool/cmd/backup/
+          backup-Wed.sql.gz
+          backup-Tue.sql.gz
+          backup-Mon.sql.gz
+          backup-Sun.sql.gz
+          backup-Sat.sql.gz
+          backup-Fri.sql.gz
+          backup-Thu.sql.gz
+
+        – the CMDaemon database can also be manually backed up with the cmdaemon-backup com-
+          mand. This can be useful if the administrator would like to carry out an extensive change
+          on the cluster and would like the reassuring possibility of getting back the old configuration.
+          If no argument is supplied to cmdaemon-backup, then any existing default backup of the day
+          is overwritten. If a string is supplied, then the default backup- prefix is replaced. The re-
+          placement becomes the supplied string concatenated with a timestamp. This is most easily
+          illustrated with an example:
+
+          Example
+          [root@basecm11 ~]# cmdaemon-backup manual
+          [root@basecm11 ~]# ls /var/spool/cmd/backup/manual*
+          manual-24-08-28_13-19-59_Wed.sql.gz
+
+          The time stamp in the preceding example is of the form:
+          -<two-digit year>-<month>-<date>_<hour>-<minute>-<seconds>_
+
+   • For the monitoring data, the raw data records are not backed up locally, since these can get very
+     large. However, the configuration of the monitoring data, which is stored in the CMDaemon
+     database, is backed up for the last 7 days too.
+
+Database Corruption Messages
+A corrupted MySQL database is commonly caused by an improper shutdown of the node. To deal with
+this, when starting up, MySQL checks itself for corrupted tables, and tries to repair itself.
+
+   • If MySQL cannot start, then CMDaemon on the head node cannot start.
+
+   • If MySQL can start, but corruption is detected in the database later on, then it keeps running
+     in read-only mode. The mysql health check on the head node fails, and an info message (sec-
+     tion 10.10.4) with an indication of the issue is seen. More details can be found in /var/log/
+     cmdaemon and using service status mysql.service or journalctl -xeu mysql.service.
+     The journalctl output might show something similar to the following output extract, if corrup-
+     tion is detected in the data (some output ellipsized):
+720                                                                         Day-to-day Administration
+
+      Example
+
+      [root@basecm11 ~]# journalctl -xeu mysql.service
+      ...
+      mysqld[179281]:..546 [ERROR] [MY-012224] [InnoDB] Checksum mismatch in datafile: ./cmdaemon/....
+      mysqld[179281]:..546 [ERROR] [MY-012592] [InnoDB] Operating system error number 22 in a file....
+      mysqld[179281]:..546 [ERROR] [MY-012596] [InnoDB] Error number 22 means 'Invalid argument' ...
+      mysqld[179281]:..546 [ERROR] [MY-012131] [InnoDB] Could not find a valid tablespace file for....
+      mysqld[179281]:..546 [Warning] [MY-012049] [InnoDB] Cannot calculate statistics for table `c....
+      mysqld[179281]:..1192 [Warning] [MY-012049] [InnoDB] Cannot calculate statistics for table `....
+      mysqld[179281]:..1838 [ERROR] [MY-012224] [InnoDB] Checksum mismatch in datafile: ./cmdaemon....
+      mysqld[179281]:..1838 [ERROR] [MY-012592] [InnoDB] Operating system error number 22 in a fil....
+      mysqld[179281]:..1838 [ERROR] [MY-012596] [InnoDB] Error number 22 means 'Invalid argument' ...
+      mysqld[179281]:..1838 [ERROR] [MY-012131] [InnoDB] Could not find a valid tablespace file fo....
+      mysqld[179281]:..1838 [Warning] [MY-012049] [InnoDB] Cannot calculate statistics for table `....
+      mysqld[179281]:..2485 [Warning] [MY-012049] [InnoDB] Cannot calculate statistics for table `....
+      mysqld[179281]:..3131 [Warning] [MY-012049] [InnoDB] Cannot calculate statistics for table `....
+      mysqld[179281]:..3778 [ERROR] [MY-012224] [InnoDB] Checksum mismatch in datafile: ./cmdaemon....
+      mysqld[179281]:..3778 [ERROR] [MY-012592] [InnoDB] Operating system error number 22 in a fil....
+
+   A corrupt database can continue to run for a while, as write attempts pile up in cache. However,
+eventually the database crashes and then BCM and other systems that rely on the database cannot carry
+on. Preventing a database crash is therefore important, which is why automatic checks and repairs are
+carried out when a database starts up.
+   To fix a corrupted database, a restoration from backup can be carried out, as explained in the next
+section.
+
+Restoring From The Local Backup
+If the MySQL InnoDB repair tools do not automatically fix the problem, then the issue can normally be
+resolved with some manual intervention for a failover or non-failover configuration.
+    If the head node is a part of a failover configuration, the dbreclone option (section 15.4.2) should
+normally provide a CMDaemon and Slurm database that is current. The dbreclone option does not
+clone the monitoring data.
+
+Cloning extra databases: The file /cm/local/apps/cluster-tools/ha/conf/extradbclone.xml.
+template can be used as a template to create a file extradbclone.xml in the same directory. The
+extradbclone.xml file can then be used to define an additional database to be cloned.
+   The /etc/my.cnf file can then be updated with a new database by adding the lines:
+        replicate-do-db=<name of database>
+        binlog-do-db=<name of database>
+
+  The database can then be cloned with this new MySQL configuration by running
+  cmha dbreclone <passive>
+where <passive> is the hostname of the passive head node.
+
+    If the head node is not part of a failover configuration, then a restoration from local backup can be
+done. The local backup directory is /var/spool/cmd/backup, with contents that look like (some text
+elided):
+
+Example
+
+[root@solaris ~]# cd /var/spool/cmd/backup/
+[root@solaris backup]# ls -l
+14.4 Revision Control For Images                                                                        721
+
+total 280
+...
+-rw------- 1 root root 33804 Oct 10 04:02 backup-Mon.sql.gz
+-rw------- 1 root root 33805 Oct 9 04:02 backup-Sun.sql.gz
+-rw------- 1 root root 33805 Oct 11 04:02 backup-Tue.sql.gz
+...
+
+
+    The CMDaemon database snapshots are stored as backup-<day of week>.sql.gz In the example,
+the latest backup available in the listing for CMDaemon turns out to be backup-Tue.sql.gz
+    The latest backup can then be ungzipped and piped into the MySQL database for the user cmdaemon.
+The password, <password>, can be retrieved from /cm/local/apps/cmd/etc/cmd.conf, where it is con-
+figured in the DBPass directive (Appendix C).
+
+Example
+
+gunzip backup-Tue.sql.gz
+systemctl stop cmd #(just to make sure)
+mysql -ucmdaemon -p<password> cmdaemon < backup-Tue.sql
+
+
+    Running “systemctl start cmd” should have CMDaemon running again, this time with a restored
+database from the time the snapshot was taken. That means, that any changes that were done to BCM
+after the time the snapshot was taken are no longer implemented.
+    Monitoring data values are not kept in a database, but in files (section 14.8).
+
+14.4    Revision Control For Images
+BCM version 7 introduced support for the implementations of Btrfs provided by the distributions. Btrfs
+makes it possible to carry out revision control for images efficiently.
+
+14.4.1 Btrfs: The Concept And Why It Works Well In Revision Control For Images
+Btrfs, often pronounced “butter FS”, is a Linux implementation of a copy-on-write (COW) filesystem.
+    A COW design for a filesystem follows the principle that, when blocks of old data are to be mod-
+ified, then the new data blocks are written in a new location (the COW action), leaving the old, now
+superseded, copy of the data blocks still in place. Metadata is written to keep track of the event so that,
+for example, the new data blocks can be used seamlessly with the contiguous old data blocks that have
+not been superseded.
+    This is in contrast to the simple overwriting of old data that a non-COW filesystem such as Ext3fs
+carries out.
+    A result of the COW design means that the old data can still be accessed with the right tools, and
+that rollback and modification become a natural possible feature.
+    “Cheap” revision control is thus possible.
+    Revision control for the filesystem is the idea that changes in the file system are tracked and can
+be rolled back as needed. “Cheap” here means that COW makes tracking changes convenient, take up
+very little space, and quick. For an administrator of BCM, cheap revision control is interesting for the
+purpose of managing software images.
+    This is because for a non-COW filesystem such as Ext3fs, image variations take a large amount of
+space, even if the variation in the filesystem inside the image is very little. On the other hand, image
+variations in a COW filesystem such as Btrfs take up near-minimum space.
+    Thus, for example, the technique of using initialize and finalize scripts to generate such image vari-
+ations on the fly (section 3.20.4) in order to save space, can be avoided by using a Btrfs partition to save
+the full image variations instead.
+722                                                                            Day-to-day Administration
+
+    “Expensive” revision control on non-COW filesystems is also possible. It is merely not recom-
+mended, since each disk image takes up completely new blocks, and hence uses up more space. The
+administrator will then have to consider that the filesystem may become full much earlier. The degree
+of restraint on revision control caused by this, as well as the extra consumption of resources, means
+that revision control on non-COW filesystems is best implemented on test clusters only, rather than on
+production clusters.
+
+14.4.2 Btrfs Availability And Distribution Support
+Btrfs has been part of the Linux kernel since kernel 2.6.29-rc1. Depending on which Linux distribution
+is being used on a cluster, it may or may not be a good idea to use Btrfs in a production environment, as
+in the worst case it could lead to data loss.
+    Btrfs has been officially removed from RHEL distributions since RHEL8.
+    Btrfs features are supported in SLES15, as described at https://www.suse.com/releasenotes/x86_
+64/SUSE-SLES/15-SP1/index.html#TechInfo.Filesystems.
+    While no problems have been noticed with storing software images on Btrfs using BCM, it is highly
+advisable to keep backups of important software images on a non-Btrfs filesystem when Btrfs is used.
+    An issue with using cm-clone-install with Btrfs is described on page 792.
+
+14.4.3   Installing Btrfs To Work With Revision Control Of Images In BCM
+Installation Of btrfs-progs
+To install a Btrfs filesystem, the btrfs-progs packages must be installed from the distribution repository
+first (some lines elided):
+
+Example
+
+[root@basecm11 ~]# yum install btrfs-progs
+...
+Resolving Dependencies
+--> Running transaction check
+---> Package btrfs-progs.x86_64 0:4.9.1-1.el7 will be installed
+...
+Total download size: 678 k
+Installed size: 4.0 M
+...
+Complete!
+
+Creating A Btrfs Filesystem
+The original images directory can be moved aside first, and a new images directory created to serve as
+a future mount point for Btrfs:
+
+Example
+
+[root@basecm11 ~]# cd /cm/
+[root@basecm11 cm]# mv images images2
+[root@basecm11 cm]# mkdir images
+
+   A block device can be formatted as a Btrfs filesystem in the usual way by using the mkfs.btrfs
+command on a partition, and then mounted to the new images directory:
+
+Example
+
+[root@basecm11 cm]# mkfs.btrfs /dev/sdc1
+[root@basecm11 cm]# mount /dev/sdc1 /cm/images
+
+    If there is no spare block device, then, alternatively, a file with zeroed data can be created, formatted
+as a Btrfs filesystem, and mounted as a loop device like this:
+14.4 Revision Control For Images                                                                      723
+
+Example
+
+[root@basecm11 cm]# dd if=/dev/zero of=butter.img bs=1G count=20
+20+0 records in
+20+0 records out
+21474836480 bytes (21 GB) copied, 916.415 s, 23.4 MB/s
+[root@basecm11 cm]# mkfs.btrfs butter.img
+
+WARNING! - Btrfs Btrfs v0.20-rc1 IS EXPERIMENTAL
+WARNING! - see http://btrfs.wiki.kernel.org before using
+
+fs created label (null) on butter.img
+        nodesize 4096 leafsize 4096 sectorsize 4096 size 20.00GB
+Btrfs Btrfs v0.20-rc1
+[root@basecm11 cm]# mount -t btrfs butter.img images -o loop
+[root@basecm11 cm]# mount
+...
+/cm/butter.img on /cm/images type btrfs (rw,loop=/dev/loop0)
+
+Migrating Images With cm-migrate-images
+The entries inside the /cm/images/ directory are the software images (file trees) used to provision nodes.
+   Revision tracking of images in a Btrfs filesystem can be done by making the directory of a specific
+image a subvolume. Subvolumes in Btrfs are an extension of standard unix directories with versioning.
+The files in a subvolume are tracked with special internal Btrfs markers.
+   To have this kind of version tracking of images work, image migration cannot simply be done with a
+cp -a or a mv command. That is, moving images from theimages2 directory in the traditional filesystem,
+over to images in the images directory in the Btrfs filesystem command with the standard cp or mv
+command is not appropriate. This is because the images are to be tracked once they are in the Btrfs
+system, and are therefore not standard files any more, but instead extended, and made into subvolumes.
+   The migration for BCM software images can be carried out with the utility cm-migrate-image, which
+has the usage:
+
+   cm-migrate-image <path to old image> <path to new image>
+
+where the old image is a traditional directory, and the new image is a subvolume.
+
+Example
+
+[root@basecm11 cm]# cm-migrate-image /cm/images2/default-image /cm/images/default-image
+
+   The default-image directory, or more exactly, subvolume, must not exist in the Btrfs filesystem
+before the migration. The subvolume is created only for the image basename that is migrated, which is
+default-image in the preceding example.
+   In the OS, the btrfs utility is used to manage Btrfs. Details on what it can do can be seen in the
+btrfs(8) man page. The state of the loop filesystem can be seen, for example, with:
+
+Example
+
+[root@basecm11 cm]# btrfs filesystem show /dev/loop0
+Label: none uuid: 6f94de75-2e8d-45d2-886b-f87326b73474
+        Total devices 1 FS bytes used 3.42GB
+        devid    1 size 20.00GB used 6.04GB path /dev/loop0
+
+Btrfs Btrfs v0.20-rc1
+[root@basecm11 cm]# btrfs subvolume list /cm/images
+ID 257 gen 482 top level 5 path default-image
+724                                                                           Day-to-day Administration
+
+    The filesystem can be modified as well as merely viewed with btrfs. However, instead of using the
+utility to modify image revisions directly, it is recommended that the administrator use BCM to manage
+image version tracking, since the necessary functionality has been integrated into cmsh and Base View.
+
+14.4.4   Using cmsh For Revision Control Of Images
+Revision Control Of Images Within softwareimage Mode
+The following commands and extensions can be used for revision control in the softwareimage mode
+of cmsh:
+
+   • newrevision <parent software image name> "textual description"
+     Creates a new revision of a specified software image. For that new revision, a revision number is
+     automatically generated and saved along with time and date. The new revision receives a name
+     of the form:
+
+           <parent software image name>@<revision number>
+
+      A new Btrfs subvolume:
+
+           /cm/images/<parent software image name>-<revision number>
+
+      is created automatically for the revision. From now on, this revision is a self-contained software
+      image and can be used as such.
+
+   • revisions [-a|--all] <parent software image name>
+     Lists all revisions of specified parent software image in the order they ware created, and associates
+     the revision with the revision number under the header ID. The option -a|--all also lists revisions
+     that have been removed.
+
+   • list [-r|--revisions]
+     The option -r|--revisions has been added to the list command. It lists all revisions with their
+     name, path, and kernel version. A parent image is the one at the head of the list of revisions, and
+     does not have @<revision number> in its name.
+
+   • setparent [parent software image name] <revision name>
+     Sets a revision as a new parent. The action first saves the image directory of the current, possibly
+     altered, parent directory or subvolume, and then attempts to copy or snapshot the directory or
+     subvolume of the revision into the directory or subvolume of the parent. If the attempt fails, then
+     it tries to revert all the changes in order to get the directory or subvolume of the parent back to the
+     state it was in before the attempt.
+
+   • remove [-a|--all] [-d|--data] <parent software image name>
+     Runnning remove without options removes the parent software image. The option -a|--all re-
+     moves the parent and all its revisions. The option -d|--data removes the actual data. To run the
+     remove command, any images being removed should not be in use.
+
+Revision Control Of Images Within category Mode
+The category mode of cmsh also supports revision control.
+    Revision control can function in 3 kinds of ways when set for the softwareimage property at category
+level.
+    To explain the settings, an example can be prepared as follows: It assumes a newly-installed cluster
+with Btrfs configured and /cm/images migrated as explained in section 14.4.3. The cluster has a default
+software image default-image, and two revisions of the parent image are made from it. These are
+automatically given the paths default-image@1 and default-image@2. A category called storage is
+then created:
+
+Example
+14.4 Revision Control For Images                                                                      725
+
+[basecm11->softwareimage]% newrevision default-image "some changes"
+[basecm11->softwareimage]% newrevision default-image "more changes"
+[basecm11->softwareimage]% revisions default-image
+ID    Date                           Description
+----- ------------------------------ ------------------------------
+1     Fri, 04 Oct 2019 11:19:33 CEST some changes
+2     Fri, 04 Oct 2019 11:19:52 CEST more changes
+[basecm11->softwareimage]% list -r
+Name (key)       Path                       Kernel version
+---------------- -------------------------- --------------------------
+default-image    /cm/images/default-image 3.10.0-957.1.3.el7.x86_64
+default-image@1 /cm/images/default-image-1 3.10.0-957.1.3.el7.x86_64
+default-image@2 /cm/images/default-image-2 3.10.0-957.1.3.el7.x86_64
+[basecm11->softwareimage]% category add storage; commit
+
+   With the cluster set up like that, the 3 kinds of revision control functionalities in category mode can
+be explained as follows:
+
+  1. Category revision control functionality is defined as unset
+     If the administrator sets the softwareimage property for the category to an image without any
+     revision tags:
+
+     Example
+
+     [basecm11->category]% set storage softwareimage default-image
+
+     then nodes in the storage category take no notice of the revision setting for the image set at
+     category level.
+
+  2. Category revision control sets a specified revision as default
+
+
+     If the administrator sets the softwareimage property for the category to a specific image, with a
+     revision tag, such as default-image@1:
+
+     Example
+
+     [basecm11->category]% set storage softwareimage default-image@1
+
+     then nodes in the storage category use the image default-image@1 as their image if nothing is
+     set at node level.
+
+  3. Category revision control sets the latest available revision by default
+     If the administrator sets the softwareimage property for the category to a parent image, but tagged
+     with the reserved keyword tag latest:
+
+     Example
+
+     [basecm11->category]% set storage softwareimage default-image@latest
+
+     then nodes in the storage category use the image default-image@2 if nothing is set at node level.
+     If a new revision of default-image is created later on, with a later tag (@3, @4, @5...) then the
+     property takes the new value for the revision, so that nodes in the category will use the new
+     revision as their image.
+726                                                                        Day-to-day Administration
+
+Revision Control For Images—An Example Session
+This section uses a session to illustrate how image revision control is commonly used, with commentary
+along the way. It assumes a newly installed cluster with Btrfs configured and /cm/images migrated as
+explained in section 14.4.3.
+   First, a revision of the image is made to save its initial state:
+[basecm11->softwareimage]% newrevision default-image "Initial state"
+
+   A new image default-image@1 is automatically created with a path /cm/images/default-image-1.
+The path is also a subvolume, since it is on a Btrfs partition.
+   The administrator then makes some modifications to the parent image /cm/images/default-image,
+which can be regarded as a “trunk” revision, for those familiar with SVN or similar revision control
+systems. For example, the administrator could install some new packages, edit some configuration files,
+and so on. When finished, a new revision is created by the administrator:
+
+[basecm11->softwareimage]% newrevision default-image "Some modifications"
+
+   This image is then automatically called default-image@2 and has the path
+/cm/images/default-image-2. If the administrator then wants to test the latest revision on nodes in
+the default category, then this new image can be set at category level, without having to specify it for
+every node in that category individually:
+
+[basecm11->category]% set default softwareimage default-image@2
+
+   At this point, the content of default-image is identical to default-image@2. But changes done in
+default-image will not affect what is stored in revision default-image@2.
+   After continuing on with the parent image based on the revision default-image@2, the administrator
+might conclude that the modifications tried are incorrect or not wanted. In that case, the administrator
+can roll back the state of the parent image default-image back to the state that was previously saved as
+the revision default-image@1:
+
+[basecm11->softwareimage]% setparent default-image default-image@1
+
+    The administrator can thus continue experimenting, making new revisions, and trying them
+out by setting the softwareimage property of a category accordingly. Previously created revisions
+default-image@1 and default-image@2 will not be affected by these changes. If the administrator
+would like to completely purge a specific unused revision, such as default-image@2 for example, then
+it can be done with the -d|--data option:
+
+[basecm11->softwareimage]% remove -d default-image@2
+
+   The -d does a forced recursive removal of the default-image-2 directory, while a plain remove
+without the -d option would simply remove the object from CMDaemon, but leave default-image-2
+alone. This CMDaemon behavior is not unique for Btrfs—it is true for traditional filesystems too. It is
+however usually very wasteful of storage to do this with non-COW systems.
+
+
+14.5    BIOS And Firmware Management
+14.5.1 Introduction
+The main PC BIOS firmware is nowadays a subset of the more general firmware of a system. In older ver-
+sions of BCM, BIOS and firmware management relied on proprietary vendor implementations. While
+such legacy implementations are still in use at the time of writing of this section (December 2023), the
+modern way of managing BIOS and firmware is with the Redfish standard.
+   The Redfish standard is an industry API standard intended for RESTful management of large num-
+bers of nodes. It is supported by Dell, HPE, Intel, and others.
+14.5 BIOS And Firmware Management                                                                727
+
+   Redfish uses a pluggable framework architecture with JSON. This makes adding new properties
+easier, and also makes isolating, debugging, and fixing issues easier.
+   The CMDeamon front ends of cmsh and Base View provide a front end for BIOS and firmware man-
+agement via Redfish.
+
+14.5.2 BIOS Management With BCM JSON Configuration Templates In Redfish
+For BIOS management via Redfish, the JSON configuration is specified per vendor. In BCM the files are
+kept under:
+
+     /cm/local/apps/cm-bios-tools/templates/
+
+     By default, BCM ships with the following configuration file templates:
+
+    • dell_14g.json
+
+    • dell_15g-amd.json
+
+    • dell_15g-intel.json
+
+    • dell_r730.json
+
+    • hpe_dl110.json
+
+    • hpe_dl380g10.json
+
+Example
+
+[root@basecm11 ~]# ls -al /cm/local/apps/cm-bios-tools/templates/
+total 280
+drwxr-xr-x 2 root root    148 Nov 15 08:24 .
+drwxr-xr-x 6 root root     64 Nov 15 08:24 ..
+-rw-r--r-- 1 root root   5008 Oct 25 19:24 dell_14g.json
+-rw-r--r-- 1 root root   6411 Oct 25 19:24 dell_15g-amd.json
+-rw-r--r-- 1 root root 20493 Oct 25 19:24 dell_15g-intel.json
+-rw-r--r-- 1 root root   7052 Oct 25 19:24 dell_r730.json
+-rw-r--r-- 1 root root 211366 Oct 25 19:24 hpe_dl110.json
+-rw-r--r-- 1 root root 24448 Oct 25 19:24 hpe_dl380g10.json
+[root@basecm11 templates]# cat dell_r730.json
+
+{
+    "displayName": "Dell Inc. - PowerEdge R730",
+    "description": "Dell Inc. - PowerEdge R730 - BIOS settings template - v1.0.0",
+    "properties": [
+      {
+        "name": "BootMode",
+        "displayName": "Boot Mode",
+        "description": "This field determines the boot mode of the system.\n\nSelecting 'UEFI' enables\
+        booting to Unified Extensible Firmware Interface (UEFI) capable operating systems.\n\nSelecting\
+        'BIOS' (the default) ensures compatibility with operating systems that do not support UEFI.",
+        "type": "Enumeration",
+        "options": [
+          {
+            "displayName": "BIOS",
+            "value": "Bios"
+          },
+          {
+            "displayName": "UEFI",
+728                                                                     Day-to-day Administration
+
+              "value": "Uefi"
+          }
+        ],
+        "pos": {
+           "g": 0,
+           "r": 0,
+           "o": 0,
+           "w": 6
+        }
+      },
+      {
+        "name": "NodeInterleave",
+        "displayName": "Node Interleaving",
+        "description": "When set to Enabled, memory interleaving is supported if a symmetric memory\
+        configuration is installed. When set to Disabled, the system supports Non-Uniform Memory Access\
+        (NUMA) (asymmetric) memory configurations.\n\nOperating Systems that are NUMA-aware understand the\
+        distribution of memory in a particular system and can intelligently allocate memory in an optimal\
+        manner. Operating Systems that are not NUMA aware could allocate memory to a processor that is not\
+        local resulting in a loss of performance. Node Interleaving should only be enabled for Operating\
+        Systems that are not NUMA aware.\n\nDefault: Disabled",
+        "type": "Enumeration",
+        "options": [
+           {
+             "displayName": "Enabled",
+             "value": "Enabled"
+           },
+           {
+             "displayName": "Disabled",
+             "value": "Disabled"
+           }
+        ],
+        "pos": {
+           "g": 0,
+           "r": 0,
+           "o": 1,
+           "w": 6
+        }
+      },
+      {
+        "name": "SnoopMode",
+        "displayName": "Snoop Mode",
+        "description": "Allows tuning of memory performances under different memory bandwidths. The optimal\
+        Snoop Mode setting is highly dependent on workload type.\n\nEarly Snoop is best used for latency sensitive\
+        workloads. This setting offers the best balance between workload effects.\n\nHome Snoop is best used for\
+        NUMA workloads that need maximum local and remote memory bandwidth.\n\nCluster on Die is best used for\
+        highly NUMA optimized workloads. This setting offers the best case local memory latency, but worst case\
+        remote latency.\n\nCluster On Die is only available when Node Interleaving is Disabled.\n\nOpportunistic\
+        Snoop Broadcast, available on select processor models, works well for workloads of mixed NUMA optimization.\
+        It offers a good balance of latency and bandwidth.\n\nDefault: Early Snoop",
+        "type": "Enumeration",
+        "options": [
+           {
+             "displayName": "Early Snoop",
+             "value": "EarlySnoop"
+           },
+14.5 BIOS And Firmware Management                                                                   729
+
+...
+
+BCM BIOS Configuration States And Operations Overview
+In BCM, a BIOS configuration of a node or category can be thought of as being in one of 4 possible
+states, with 3 possible operations that apply the changes to the states. This is shown by the following
+schematic:
+
+
+cmsh or      commit                          bios apply                    reboot
+Base View --------------> CMDaemon database -----------> BIOS (pending) -----------> BIOS (live)
+
+    For example, the cluster administrator might adjust the BIOS configuration for the node or category
+in cmsh. The state set within cmsh then becomes a state stored within the CMDaemon database after the
+commit operation of cmsh is carried out.
+    The cluster administrator can then apply the BIOS configuration that is stored in the CMDaemon
+database by running the bios apply operation from within cmsh. The BIOS configuration is then taken
+up as the BIOS (pending) state stored in the BIOS firmware of the node (or category).
+    Finally, the cluster administrator can implement the BIOS, so that it runs on the live node (or cat-
+egory). This happens when carrying out a reboot operation for that node (or category). The BIOS
+configuration that was a pending BIOS setting then becomes a live BIOS setting.
+    The details of how these changes can be carried out are explained in the following sections.
+
+Example BIOS Configuration Session In cmsh
+In cmsh, the BIOS settings can be viewed, compared, and applied at the device mode level or category
+mode level.
+    The BIOS settings for the various states can alternatively be managed using the cm-bios-manage
+utility (page 732). However the cmsh or Base View front ends to cm-bios-manage are easier to use.
+
+Model: The model must be set for the BIOS settings before other BIOS settings can be managed. If it
+is not set, then the status command in biossettings displays an error, as indicated by the following
+cmsh session:
+
+Example
+
+[basecm11->device[node002]->biossettings]% status
+Parameter                        Configured Pending Live
+-------------------------------- ---------- ------- ----
+Pending errors:
+No model defined
+
+      It can be set with the help of tab-completion:
+
+Example
+
+[basecm11->device[node002]->biossettings]% set model<tab><tab>
+dell_r730 hpe_dl380
+[basecm11->device[node002]->biossettings]% set model hpe_dl380
+[basecm11->device*[node002*]->biossettings*]% commit
+
+Viewing BIOS Parameters: Each BIOS parameter can now have its value listed and compared by state.
+    The status command shows a list of the parameters, and their values are displayed for each state.
+So, the state columns show:
+
+  1. the BIOS parameter as stored in the CMDaemon database (the Configured column),
+
+  2. the BIOS parameter as stored on the node itself (the Pending column),
+730                                                                       Day-to-day Administration
+
+  3. the BIOS parameter as implemented on the node itself (the Live column)
+
+Example
+
+[basecm11->device[node002]]% biossettings
+[basecm11->device[node002]->biossettings]% status
+Parameter                                       Configured     Pending Live
+----------------------------------------------- -------------- ------- -----------------------------
+High Precision Event Timer (HPET) ACPI Support < default >     -       Enabled
+Adjacent Sector Prefetch                        < default >    -       Enabled
+Boot Mode                                       < default >    -       UEFI Mode
+Boot Order Policy                               < default >    -       Retry Boot Order Indefinitely
+Channel Interleaving                            < default >    -       Enabled
+Collaborative Power Control                     < default >    -       Enabled
+Consistent Device Naming                        < default >    -       CDN Support for LOMs and Slots
+Custom POST Message                             < default >    -
+LLC Prefetch                                    < default >    -       Disabled
+Local/Remote Threshold                          < default >    -       Auto
+Maximum Memory Bus Frequency                    < default >    -       Auto
+Maximum PCI Express Speed                       < default >    -       Per Port Control
+Memory Mirroring Mode                           < default >    -       Full Mirror
+Memory Patrol Scrubbing                         < default >    -       Enabled
+Memory Refresh Rate                             < default >    -       1x Refresh
+Minimum Processor Idle Power Package C-State    < default >    -       Package C6 (retention) State
+Minimum Processor Idle Power Core C-State       < default >    -       C6 State
+Mixed Power Supply Reporting                    < default >    -       Enabled
+Network Boot Retry Support                      < default >    -       Enabled
+Node Interleaving                               < default >    -       Disabled
+NUMA Group Size Optimization                    < default >    -       Flat
+Embedded NVM Express Option ROM                 < default >    -       Enabled
+NVMe PCIe Resource Padding                      < default >    -       Normal
+Persistent Memory Address Range Scrub           < default >    -       Enabled
+POST Verbose Boot Progress                      < default >    -       Disabled
+Power-On Delay                                  < default >    -       No Delay
+Server Asset Tag                                < default >    -
+Network Boot Retry Count                        < default >    -       20
+
+    In the preceding example, each parameter of the configured column has a setting of < default >.
+This means that the value for the configured setting is a null value, as achieved by running the clear
+command for that setting. A BIOS setting configured with < default > as a value does nothing based
+on that configuration setting when doing BIOS management operations. Thus, for example, the setting
+for Boot Mode in the Configured column can only be made to cause a change in the Pending or Live
+columns if it takes a value that is not default.
+
+Changing And Checking Changes For BIOS Parameters:         Thus, if the states for a node are as follows
+for the Boot Mode parameter:
+
+Example
+
+[basecm11->device[node002]->biossettings]% status |head -2 ; status |grep "Boot Mode"
+Parameter                                       Configured       Pending         Live
+----------------------------------------------- ---------------- --------------- ----------------
+Boot Mode                                       < default >      -               UEFI Mode
+
+      then have the Live state value change from UEFI Mode to Legacy BIOS Mode:
+14.5 BIOS And Firmware Management                                                                 731
+
+  1. the first step is to change the Configured state:
+
+     Example
+
+     [basecm11->device[node002]->biossettings]% set boot mode<tab><tab>
+     legacy bios mode uefi mode
+     [basecm11->device[node002]->biossettings]% set boot mode legacy bios mode
+     [basecm11->device*[node002]->biossettings*]% commit
+     [basecm11->device[node002]->biossettings]% status |head -2 ; status |grep "Boot Mode"
+     Parameter                                       Configured         Pending       Live
+     ----------------------------------------------- ---------------- --------------- ----------------
+     Boot Mode                                       Legacy BIOS Mode -               UEFI Mode
+
+        • Beside using the status command within the biossettings submode, the existing BIOS
+          states that are configured (in CMDaemon) and detected (on the live node) can also be checked
+          with the bios check command at node or category level:
+           Example
+           [basecm11->device[node002]->biossettings]% ..
+           [basecm11->device[node002]]% bios check
+           Result     Parameter                        Configured                       Detected
+           ---------- -------------------------------- -------------------------------- ----------
+           different BootMode                          LegacyBios                       Uefi
+
+           The bios check command shows a result if there is a difference between the configured (CM-
+           Daemon) and detected (live) configuration.
+
+  2. The next step is to apply the configuration change to the Pending BIOS state:
+
+     Example
+
+     [basecm11->device[node002]]% bios apply
+     Node             Result   Output                           Error
+     ---------------- -------- -------------------------------- --------------------------------
+     node002          good
+     [basecm11->device[node002]]% biossettings
+     [basecm11->device[node002]->biossettings]% status |head -2 ; status |grep "Boot Mode"
+     Parameter                                       Configured       Pending          Live
+     ----------------------------------------------- ---------------- ---------------- ---------------
+     Boot Mode                                       Legacy BIOS Mode Legacy BIOS Mode UEFI Mode
+
+  3. Finally, a reboot causes the Pending value to be made live:
+
+     Example
+
+     [basecm11->device[node002]->biossettings]% ..
+     [basecm11->device[node002]]% reboot
+     [cluster administrator waits for the node to finish rebooting]
+
+    The BIOS change to the Live state is then complete. The Pending and Configured state values are
+cleared automatically too, so that the states for the Boot Mode parameter now show:
+Example
+[basecm11->device[node002]->biossettings]% status |head -2 ; status |grep "Boot Mode"
+Parameter                                       Configured       Pending         Live
+----------------------------------------------- ---------------- --------------- ----------------
+Boot Mode                                       < default >      -               Legacy BIOS Mode
+732                                                                          Day-to-day Administration
+
+BIOS Configuration Via cm-bios-manage
+This section can usually be skipped because the administrator is not expected to use the cm-bios-manage
+utility directly.
+    This is because it is relatively low-level, and because the easiest way for a cluster administrator to
+manage the BIOS of a cluster via Redfish is usually via the cmsh (page 729) or Base View front ends.
+    The cm-bios-manage help text is:
+
+[root@basecm11 ~]# /cm/local/apps/cm-bios-tools/bin/cm-bios-manage -h
+usage: cm-bios-manage [-h]
+                      [-a | -c | -f VENDOR_MODEL | -p VENDOR_MODEL | -P VENDOR_MODEL PROFILE | -t |
+-T VENDOR_MODEL] [-l] [-d]
+
+Script used by cmd to manage BIOS settings.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -a, --apply           apply settings.
+  -c, --check           check defined settings.
+  -f VENDOR_MODEL, --fetch VENDOR_MODEL
+                        fetch settings based on JSON template of specified model.
+  -p VENDOR_MODEL, --profiles VENDOR_MODEL
+                        list all profiles for the specified model.
+  -P VENDOR_MODEL PROFILE, --profile VENDOR_MODEL PROFILE
+                        display profile for the specified model and specified profile.
+  -t, -m, --vendor-types, --models
+                list all supported HW models.
+  -T VENDOR_MODEL, --template VENDOR_MODEL
+                        display JSON template of specified HW model.
+  -l, --live            fetch live settings, instead of pending settings.
+                        used with --fetch and --check options.
+  -d, --debug           enable debug messages.
+
+      A session with options might run as follows:
+
+Example
+
+[root@basecm11 ~]# /cm/local/apps/cm-bios-tools/python/cm-bios-manage -t
+[
+  "dell_r730",
+  "hpe_dl380"
+]
+[root@basecm11 ~]# /cm/local/apps/cm-bios-tools/python/cm-bios-manage -p hpe_dl380
+[
+  "test"
+]
+[root@basecm11 ~]# /cm/local/apps/cm-bios-tools/python/cm-bios-manage -P hpe_dl380 test
+{
+  "test": "xyz"
+}
+[root@basecm11 ~]# /cm/local/apps/cm-bios-tools/python/cm-bios-manage -T hpe_dl380
+[
+  {
+    "displayName": "High Precision Event Timer (HPET) ACPI Support",
+    "name": "AcpiHpet",
+    "pos": {
+      "w": 12,
+14.5 BIOS And Firmware Management                                                                   733
+
+        "r": 0,
+        "o": 0,
+        "g": 0
+      },
+...
+
+14.5.3 Updating BIOS And Firmware Versions
+There are two ways that the firmware can be updated. A legacy way based on DOS tools (page 733),
+and a more recent way, based on CMDaemon and Redfish (page 733).
+
+Updating A BIOS Via DOS Tools
+The legacy way of upgrading a BIOS to a new version involves using the DOS tools that were supplied
+with the BIOS to flash a new BIOS. The flash tool and the BIOS image must be copied to a DOS image.
+The file autoexec.bat should be altered to invoke the flash utility with the correct parameters. In case
+of doubt, it can be useful to boot the DOS image and invoke the BIOS flash tool manually. Once the
+correct parameters have been determined, they can be added to the autoexec.bat.
+   After a BIOS upgrade, the contents of the NVRAM may no longer represent a valid BIOS config-
+uration because different BIOS versions may store a configuration in different formats. It is therefore
+recommended to also write updated NVRAM settings immediately after flashing a BIOS image.
+   The next section describes how to boot the DOS image.
+
+Booting the DOS image: To boot the DOS image over the network, it first needs to be copied to soft-
+ware image’s /boot directory, and must be world-readable.
+Example
+cp flash.img /cm/images/default-image/boot/bios/flash.img
+chmod 644 /cm/images/default-image/boot/bios/flash.img
+
+    An entry is added to the PXE boot menu to allow the DOS image to be selected. This can easily
+be achieved by modifying the contents of /cm/images/default-image/boot/bios/menu.conf, which
+is by default included automatically in the PXE menu. By default, one entry Example is included in the
+PXE menu, which is however invisible as a result of the MENU HIDE option. Removing the MENU HIDE
+line will make the BIOS flash option selectable. Optionally the LABEL and MENU LABEL may be set to an
+appropriate description.
+    The option MENU DEFAULT may be added to make the BIOS flash image the default boot option. This
+is convenient when flashing the BIOS of many nodes.
+Example
+  LABEL FLASHBIOS
+    KERNEL memdisk
+    APPEND initrd=bios/flash.img
+    MENU LABEL ^Flash BIOS
+  # MENU HIDE
+    MENU DEFAULT
+
+The bios/menu.conf file may contain multiple entries corresponding to several DOS images to allow
+for flashing of multiple BIOS versions or configurations.
+
+Firmware Configuration And Updates Via CMDaemon
+For systems that support the Redfish protocol, such as HPE iLO5 and DGX H100, firmware management
+requires setting firmwaremanagemode, within a bmcsettings submode.
+   In addition, for DGX hardware, after the firmware has been flashed over to it, an activation based
+on an AC power cycle is required. Details on this are given (page 740) as part of the DGX installation
+example later on (page 735).
+734                                                                         Day-to-day Administration
+
+Setting firmwaremanagemode: The value of firmwaremanagemode is selected appropriately by the ad-
+ministrator according to the node hardware:
+Example
+[basecm11->device*[node001*]->bmcsettings*]% set firmwaremanagemode <TAB><TAB>
+auto     b200     gb200    gb200sw h100      ilo      none
+The bmcsettings submode can be accessed and set within an instance of the device, category, or
+partition modes.
+
+Running firmware operations and options: After firmwaremanagemode has been set, the firmware
+command can be run under the device mode of cmsh to carry out Redfish protocol updates. Firmware
+updated via Redfish need not be just the PC main system BIOS, but can also be the flashable software of
+subsystems, for example: NICs.
+   The help firmware command provides a help page covering the operations and options for the
+firmware command. Some of them are described next:
+   • The firmware command includes the following operations:
+
+        – info: provides information on the firmwares available on the head node, available for up-
+          loading to nodes. By default these are files that the cluster administrator has picked up from
+          the vendor and has placed under /cm/local/apps/cmd/etc/htdocs/bios/firmware/.
+        – list: (only for iLO) provides a list of firmware states on specified nodes.
+        – upload: (only for iLO) takes a specified firmware from the files listed by the info option, and
+          copies it over to the specified nodes. For an HPE iLO system, the upload is carried out to a
+          special flash storage, only visible to the BIOS and Redfish queries. After it is in that special
+          flash location, it can be flashed to where the firmware is actually run.
+        – remove: (only for iLO) removes a specified firmware from the special flash storage of specified
+          nodes
+        – flash : carries out the flashing of the firmware from the flash storage to the location where
+          the firmware runs, for the specified nodes
+        – status: shows the status of the flash operation. A table is displayed with rows listing the
+          component, version, and state, among other items. The State column of the output can show
+          the following values:
+            * pending: the flash operation is pending
+            * exception: the flash operation failed during execution
+            * flashing: the flash operation is being executed
+            * completed: the flash operation succeeded
+            * current: the firmware of the listed component with the listed version is activated
+   • The firmware command also includes the following options:
+        – --targets: (only for DGX hosts) specifies names for particular component firmware targets.
+          Without this option, the default is that updates are carried out automatically only for newer
+          firmware components from the firmware package files. Overriding the default should not be
+          needed, and is typically not recommended. Specifying --targets list -v lists the possible
+          components.
+        – --force: (only for DGX hosts) needed to carry out a downgrade, and also needed
+          for some other DGX firmware cases as described in https://docs.nvidia.com/dgx/
+          dgxh100-fw-update-guide/sequence.html#update-steps
+        – --dry-run: (only for DGX hosts) pretends to carry out an installation, so that the administra-
+          tor can get an idea of what components are affected from the output of the mock installation
+          run
+14.5 BIOS And Firmware Management                                                                  735
+
+An HP iLO5 firmware upgrade example: The following session shows node001 getting uploaded and
+flashed with a firmware, and then having the firmware removed.
+
+Example
+
+[basecm11->device]% firmware info
+Device Filename       Component        Version State       Progress Result Size       Date
+-------- ------------ ---------------- -------- ---------- -------- -------- -------- ---------------------
+basecm11 iLO5-2.42    iLO5             2.42     undefined N/A                8.6MiB 02/28/2022, 11:22:55
+basecm11 iLO5-2.43    iLO5             2.43     undefined N/A                8.7MiB 02/28/2022, 11:22:55
+basecm11 iLO5-2.44    iLO5             2.44     undefined N/A                8.8MiB 02/28/2022, 11:22:55
+basecm11 iLO5-2.45    iLO5             2.45     undefined N/A                8.9MiB 02/28/2022, 11:22:55
+
+[basecm11->device]% firmware list -n node001
+
+[basecm11->device]% firmware upload iLO5-2.42 -n node001
+Device Result     Output                 Error
+-------- -------- ---------------------- --------------------------------
+node001 good      uploading: iLO5-2.42
+
+[basecm11->device]% firmware list -n node001
+Device Filename       Component        Version State       Progress Result Size       Date
+-------- ------------ ---------------- -------- ---------- -------- -------- -------- ---------------------
+node001 iLO5-2.42     iLO5             2.42     completed N/A                8.6MiB 02/28/2022, 11:23:31
+
+[basecm11->device]% firmware flash iLO5-2.42 -n node001
+Device Result     Output                 Error
+-------- -------- ---------------------- --------------------------------
+node001 good      flashing: iLO5-2.42
+
+[basecm11->device]% firmware status -n node001
+Device Filename       Component        Version State      Progress Result Size       Date
+-------- ------------ ---------------- -------- --------- -------- -------- -------- ---------------------
+node001               iLO5             2.42     flashing 35.6%              N/A      02/28/2022, 11:27:27
+
+[basecm11->device]% firmware status -n node001
+Device Filename       Component        Version State       Progress Result Size       Date
+-------- ------------ ---------------- -------- ---------- -------- -------- -------- ---------------------
+node001               iLO5             2.42     completed N/A                N/A      02/28/2022, 11:27:27
+
+[basecm11->device]% firmware remove iLO5-2.42 -n node001
+Device Result     Output                 Error
+-------- -------- ---------------------- --------------------------------
+node001 good      removed: iLO5-2.42
+
+[basecm11->device]% firmware list -n node001
+
+
+
+A GPU tray upgrade example on the DGX H100: The procedure to upgrade DGX firmware varies
+slightly across the different hardwares (H100, B200, GB200 ...). For the DGX H100 the upgrade procedure
+is as follows:
+
+  Obtaining and placing the firmware packages on the DGX H100 cluster: Firmware for the DGX
+H100 is available for the motherboard tray (chassis) components, and for the GPU tray components.
+736                                                                         Day-to-day Administration
+
+   Firmware packages for the DGX H100 can be obtained via the DGX support portal, which can be
+reached from:
+   https://docs.nvidia.com/dgx/dgxh100-fw-update-guide/about.html#firmware-update-prerequisites.
+   The packages are available as .fwpkg packages. They should be placed in the head node directory at
+   /cm/local/apps/cmd/etc/htdocs/bios/firmware/
+   under the appropriate existing subdirectory for the platform type:
+
+Example
+
+[basecm11 ~]# ls -l /cm/local/apps/cmd/etc/htdocs/bios/firmware/h100
+-rw-r--r-- 1 root root 135723563 Dec 12 14:27 nvfw_DGX-H100_0003_230817.1.1_custom_prod-signed.fwpkg
+-rw-r--r-- 1 root root 135723563 Dec 12 14:27 nvfw_DGX-H100_0003_230905.1.0_custom_prod-signed.fwpkg
+-rw-r--r-- 1 root root 135723563 Dec 12 14:27 nvfw_DGX-H100_0003_230920.1.0_custom_prod-signed.fwpkg
+-rw-r--r-- 1 root root 106091440 Dec 12 14:27 nvfw_DGX-HGX-H100x8_0002_230705.1.1_prod-signed.fwpkg
+
+   Configuring BMC settings in BCM for the DGX H100: The BMC interface and settings should be
+configured for the DGX H100. Typically this requires:
+
+  • adding a BMC network (section 3.2.2)
+
+  • configuring its BMC settings (section 3.7.2) to be able to carry out the Redfish protocol. This means
+    setting the:
+
+       – username
+       – userid
+       – password
+       – firmware mode for Redfish
+
+  • adding an interface to the network for the node (section 3.7.1).
+
+Example
+
+[basecm11 ~]# cmsh
+[basecm11]% network
+[basecm11->network]% add bmcnet
+[basecm11->network*[bmcnet*]]% set baseaddress 10.148.0.0
+[basecm11->network*[bmcnet*]]% set domainname bmc.cluster
+[basecm11->network*[bmcnet*]]% commit
+[basecm11->network[bmcnet]]% partition
+[basecm11->partition[base]]% bmcsettings
+[basecm11->partition[base]->bmcsettings]% set username admin
+[basecm11->partition*[base*]->bmcsettings*]% set userid 0
+[basecm11->partition*[base*]->bmcsettings*]% set password < password>
+[basecm11->partition*[base*]->bmcsettings*]% set firmwaremanagemode <TAB><TAB>
+auto     b200      gb200   gb200sw h100      ilo       none
+[basecm11->partition*[base*]->bmcsettings*]% set firmwaremanagemode h100
+[basecm11->partition*[base*]->bmcsettings*]% commit
+[basecm11->partition[base]->bmcsettings]% device
+[basecm11->device]% interfaces node001
+[basecm11->device[node001]->interfaces]% add bmc
+[basecm11->device[node001]->interfaces]% add bmc ipmi0
+[basecm11->device*[node001*]->interfaces*[ipmi0*]]% set network bmcnet
+[basecm11->device*[node001*]->interfaces*[ipmi0*]]% set ip 10.148.0.1
+14.5 BIOS And Firmware Management                                                               737
+
+   Managing, installing and updating the firmware package in BCM for the DGX H100: BCM can
+then display information about the files in that head node firmware directory with the firmware info
+command:
+
+Example
+
+[basecm11->device]% firmware info
+Device Filename                       Component         Version             State      Progress        ...
+-------- ---------------------------- ----------------- ------------------- ---------- --------
+basecm11 nvfw_DGX-H100_...fwpkg       DGX-H100-Chassis DGX-H100_0003_2... available N/A
+basecm11 nvfw_DGX-H100_...fwpkg       DGX-H100-Chassis DGX-H100_0003_2... available N/A
+basecm11 nvfw_DGX-HGX-H100x8_...fwpkg DGX-H100-GPU      DGX-HGX-H100x8_... available N/A
+
+   The firmware status command displays information on the state of the firmware components run-
+ning on the node:
+
+Example
+
+[basecm11->device]% firmware status -n node001
+Device Filename Component                  Version              State Progress Result Size Date
+------- -------- ------------------------- -------------------- ------- --------- ------ ---- ----
+node001          CPLDMB_0                  0.2.1.0              current N/A              N/A
+node001          CPLDMID_0                 0.2.1.0              current N/A              N/A
+node001          EROT_BIOS_0               00.04.0020.0000_n00 current N/A               N/A
+node001          EROT_BMC_0                00.04.0020.0000_n00 current N/A               N/A
+node001          HGX_FW_BMC_0              HGX-22.10-1-rc1      current N/A              N/A
+node001          HGX_FW_ERoT_BMC_0         00.02.0100.0000_n00 current N/A               N/A
+node001          HGX_FW_ERoT_FPGA_0        00.02.0100.0000_n00 current N/A               N/A
+node001          HGX_FW_ERoT_NVSwitch_0    00.02.0100.0000_n00 current N/A               N/A
+node001          HGX_FW_ERoT_NVSwitch_1    00.02.0100.0000_n00 current N/A               N/A
+node001          HGX_FW_ERoT_NVSwitch_2    00.02.0100.0000_n00 current N/A               N/A
+node001          HGX_FW_ERoT_NVSwitch_3    00.02.0100.0000_n00 current N/A               N/A
+node001          HGX_FW_ERoT_PCIeSwitch_0 00.02.0100.0000_n00 current N/A                N/A
+node001          HGX_FW_FPGA_0             2.0A                 current N/A              N/A
+node001          HGX_FW_GPU_SXM_1          96.00.70.00.01       current N/A              N/A
+node001          HGX_FW_GPU_SXM_2          96.00.70.00.01       current N/A              N/A
+node001          HGX_FW_GPU_SXM_3          96.00.70.00.01       current N/A              N/A
+node001          HGX_FW_GPU_SXM_4          96.00.70.00.01       current N/A              N/A
+node001          HGX_FW_GPU_SXM_5          96.00.70.00.01       current N/A              N/A
+node001          HGX_FW_GPU_SXM_6          96.00.70.00.01       current N/A              N/A
+node001          HGX_FW_GPU_SXM_7          96.00.70.00.01       current N/A              N/A
+node001          HGX_FW_GPU_SXM_8          96.00.70.00.01       current N/A              N/A
+node001          HGX_FW_NVSwitch_0         96.00.3F.00.01       current N/A              N/A
+node001          HGX_FW_NVSwitch_1         96.00.3F.00.01       current N/A              N/A
+node001          HGX_FW_NVSwitch_2         96.00.3F.00.01       current N/A              N/A
+node001          HGX_FW_NVSwitch_3         96.00.3F.00.01       current N/A              N/A
+node001          HGX_FW_PCIeRetimer_0      2.7.0                current N/A              N/A
+node001          HGX_FW_PCIeRetimer_1      2.7.0                current N/A              N/A
+node001          HGX_FW_PCIeRetimer_2      2.7.0                current N/A              N/A
+node001          HGX_FW_PCIeRetimer_3      2.7.0                current N/A              N/A
+node001          HGX_FW_PCIeRetimer_4      2.7.0                current N/A              N/A
+node001          HGX_FW_PCIeRetimer_5      2.7.0                current N/A              N/A
+node001          HGX_FW_PCIeRetimer_6      2.7.0                current N/A              N/A
+node001          HGX_FW_PCIeRetimer_7      2.7.0                current N/A              N/A
+node001          HGX_FW_PCIeSwitch_0       1.7.5A               current N/A              N/A
+node001          HostBIOS_0                01.00.00             current N/A              N/A
+738                                                                   Day-to-day Administration
+
+node001          HostBMC_0                 23.00.00             current   N/A            N/A
+node001          PCIeRetimer_0             1.30.0               current   N/A            N/A
+node001          PCIeRetimer_1             1.30.0               current   N/A            N/A
+node001          PCIeSwitch_0              0.0.1                current   N/A            N/A
+node001          PCIeSwitch_1              1.0.1                current   N/A            N/A
+node001          PSU_0                     0202.0200.0200       current   N/A            N/A
+node001          PSU_1                     0202.0200.0200       current   N/A            N/A
+node001          PSU_2                     0202.0200.0200       current   N/A            N/A
+node001          PSU_3                     0202.0201.0202       current   N/A            N/A
+node001          PSU_4                     0202.0201.0203       current   N/A            N/A
+node001          PSU_5                     0202.0200.0200       current   N/A            N/A
+
+   Components can be updated by installing associated firmware packages with the firmware flash
+command. For example, the GPU tray firmware can be installed with one of the nvfw_dgx-hgx-h100x8*
+packages:
+
+Example
+
+[basecm11->device[node001]]% firmware flash <TAB><TAB>
+nvfw_dgx-h100_0003_230817.1.1.fwpkg
+nvfw_dgx-h100_0003_230920.1.0.fwpkg
+nvfw_dgx-hgx-h100x8_0002_230705.1.1.fwpkg
+[basecm11->device[node001]]% firmware flash nvfw_dgx-hgx-h100x8_0002_230705.1.1.fwpkg
+Device           flashing                                   Result Error
+---------------- ------------------------------------------ -------- ----------
+node001          nvfw_DGX-HGX-H100x8_0002_230705.1.1.fwpkg good
+
+   The firmware status command then shows the installation progress for the GPU tray components
+during flashing:
+
+Example
+
+[basecm11->device]% firmware -n node001 status
+Device Filename              Component                 Version              State     Progress...
+------- -------------------- ------------------------- -------------------- --------- --------
+node001                      CPLDMB_0                  0.2.1.0              current   N/A
+node001                      CPLDMID_0                 0.2.1.0              current   N/A
+node001                      EROT_BIOS_0               00.04.0020.0000_n00 current N/A
+node001                      EROT_BMC_0                00.04.0020.0000_n00 current N/A
+node001                      HostBIOS_0                01.00.00             current N/A
+node001                      HostBMC_0                 23.00.00             current N/A
+node001                      PCIeRetimer_0             1.30.0               current N/A
+node001                      PCIeRetimer_1             1.30.0               current N/A
+node001                      PCIeSwitch_0              0.0.1                current N/A
+node001                      PCIeSwitch_1              1.0.1                current N/A
+node001                      PSU_0                     0202.0200.0200       current N/A
+node001                      PSU_1                     0202.0200.0200       current N/A
+node001                      PSU_2                     0202.0200.0200       current N/A
+node001                      PSU_3                     0202.0201.0202       current N/A
+node001                      PSU_4                     0202.0201.0203       current N/A
+node001                      PSU_5                     0202.0200.0200       current N/A
+node001 nvfw_DGX-HG...fwpkg HGX_FW_BMC_0               HGX-22.10-1-rc1      flashing 39.1%
+node001 nvfw_DGX-HG...fwpkg HGX_FW_ERoT_BMC_0          00.02.0100.0000_n00 flashing 39.1%
+node001 nvfw_DGX-HG...fwpkg HGX_FW_ERoT_FPGA_0         00.02.0100.0000_n00 flashing 39.1%
+node001 nvfw_DGX-HG...fwpkg HGX_FW_ERoT_NVSwitch_0     00.02.0100.0000_n00 flashing 39.1%
+node001 nvfw_DGX-HG...fwpkg HGX_FW_ERoT_NVSwitch_1     00.02.0100.0000_n00 flashing 39.1%
+14.5 BIOS And Firmware Management                                                                 739
+
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_ERoT_NVSwitch_2     00.02.0100.0000_n00   flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_ERoT_NVSwitch_3     00.02.0100.0000_n00   flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_ERoT_PCIeSwitch_0   00.02.0100.0000_n00   flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_FPGA_0              2.0A                  flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_GPU_SXM_1           96.00.70.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_GPU_SXM_2           96.00.70.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_GPU_SXM_3           96.00.70.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_GPU_SXM_4           96.00.70.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_GPU_SXM_5           96.00.70.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_GPU_SXM_6           96.00.70.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_GPU_SXM_7           96.00.70.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_GPU_SXM_8           96.00.70.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_NVSwitch_0          96.00.3F.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_NVSwitch_1          96.00.3F.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_NVSwitch_2          96.00.3F.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_NVSwitch_3          96.00.3F.00.01        flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_PCIeRetimer_0       2.7.0                 flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_PCIeRetimer_1       2.7.0                 flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_PCIeRetimer_2       2.7.0                 flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_PCIeRetimer_3       2.7.0                 flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_PCIeRetimer_4       2.7.0                 flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_PCIeRetimer_5       2.7.0                 flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_PCIeRetimer_6       2.7.0                 flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_PCIeRetimer_7       2.7.0                 flashing   39.1%
+node001 nvfw_DGX-HG...fwpkg   HGX_FW_PCIeSwitch_0        1.7.5A                flashing   39.1%
+
+    The non-GPU-related firmware components are not updated.
+    If the firmware flash command stage has completed its run, then when the firmware status com-
+mand is run, the Component and Version columns show output indicating that the firmware version
+is transitioning. The rows that have to do with the GPU firmware status are the rows with the string
+nvfw_DGX-HG in the Filename column. Those GPU firmware rows have Component and Version column
+entries such as:
+
+Example
+
+[basecm11->device[node001]]% firmware status| head -2| cut -b66-133; firmware status| grep nvfw| cut -b66-133
+Component                 Version
+------------------------- ------------------------------------------
+HGX_FW_BMC_0              HGX-22.10-1-rc1 -> HGX-22.10-1-rc44
+HGX_FW_ERoT_BMC_0         00.02.0100.0000_n00 -> 00.02.0134.0000_n00
+HGX_FW_ERoT_FPGA_0        00.02.0100.0000_n00 -> 00.02.0134.0000_n00
+HGX_FW_ERoT_NVSwitch_0    00.02.0100.0000_n00 -> 00.02.0134.0000_n00
+HGX_FW_ERoT_NVSwitch_1    00.02.0100.0000_n00 -> 00.02.0134.0000_n00
+HGX_FW_ERoT_NVSwitch_2    00.02.0100.0000_n00 -> 00.02.0134.0000_n00
+HGX_FW_ERoT_NVSwitch_3    00.02.0100.0000_n00 -> 00.02.0134.0000_n00
+HGX_FW_ERoT_PCIeSwitch_0 00.02.0100.0000_n00 -> 00.02.0134.0000_n00
+HGX_FW_FPGA_0             2.0A -> 2.2C
+HGX_FW_GPU_SXM_1          96.00.70.00.01 -> 96.00.74.00.01
+HGX_FW_GPU_SXM_2          96.00.70.00.01 -> 96.00.74.00.01
+HGX_FW_GPU_SXM_3          96.00.70.00.01 -> 96.00.74.00.01
+HGX_FW_GPU_SXM_4          96.00.70.00.01 -> 96.00.74.00.01
+HGX_FW_GPU_SXM_5          96.00.70.00.01 -> 96.00.74.00.01
+HGX_FW_GPU_SXM_6          96.00.70.00.01 -> 96.00.74.00.01
+HGX_FW_GPU_SXM_7          96.00.70.00.01 -> 96.00.74.00.01
+HGX_FW_GPU_SXM_8          96.00.70.00.01 -> 96.00.74.00.01
+HGX_FW_NVSwitch_0         96.00.3F.00.01 -> 96.10.3F.00.01
+740                                                                       Day-to-day Administration
+
+HGX_FW_NVSwitch_1          96.00.3F.00.01 -> 96.10.3F.00.01
+HGX_FW_NVSwitch_2          96.00.3F.00.01 -> 96.10.3F.00.01
+HGX_FW_NVSwitch_3          96.00.3F.00.01 -> 96.10.3F.00.01
+HGX_FW_PCIeRetimer_0       2.7.0 -> 2.7.9
+HGX_FW_PCIeRetimer_1       2.7.0 -> 2.7.9
+HGX_FW_PCIeRetimer_2       2.7.0 -> 2.7.9
+HGX_FW_PCIeRetimer_3       2.7.0 -> 2.7.9
+HGX_FW_PCIeRetimer_4       2.7.0 -> 2.7.9
+HGX_FW_PCIeRetimer_5       2.7.0 -> 2.7.9
+HGX_FW_PCIeRetimer_6       2.7.0 -> 2.7.9
+HGX_FW_PCIeRetimer_7       2.7.0 -> 2.7.9
+HGX_FW_PCIeSwitch_0        1.7.5A -> 1.7.5F
+
+    In the preceding, the grep command is to select just the GPU-related rows, and the cut commands
+are used to remove some columns, to make the output clearer to the reader.
+    The firmware status GPU firmware rows also have the following output columns:
+
+   • the State column, which shows Pending if there are activation steps still required to complete the
+     firmware update
+
+   • the Result column, which suggests the recommended action to take to activate the firmware
+
+Example
+
+[basecm11->device[node001]]% firmware status #other rows and columns omitted for readability
+State    Progress Result                               Size     Date
+-------- -------- ------------------------------------ -------- --------
+pending N/A       success: AC power cycle to activate 1.22KiB
+pending N/A       success: AC power cycle to activate 1.22KiB
+pending N/A       success: AC power cycle to activate 1.22KiB
+...
+
+    AC and DC power cycling for the DGX H100: As suggested in the Result column in the preceding
+example, an AC power cycle must then be carried out on the node to activate the GPU firmware with
+the new versions. The AC power cycle tag is a part of Redfish terminology, and it implies that all the
+AC power inputs need to be cut off. This can be carried out via a PDU powering off the entire system,
+or it can be done physically, by hand, by pulling out all the mains (AC) power leads to the system.
+    A regular power reset command run from the device mode of cmsh, which is a board level (DC)
+power cycle by default, is not enough to initialize some of the components for the DGX H100.
+    Details on firmware activation for the DGX H100 can be found at https://docs.nvidia.com/dgx/
+dgxh100-fw-update-guide/about.html#firmware-update-activation.
+
+    Successful activation and completed state confirmations for the DGX H100: After the power cy-
+cle, the output from firmware status indicates that the firmware now active on the node matches that
+of the .fwpkg file version.
+    It does this by displaying a value of
+    success: activated
+    in the Result column.
+    The output also now shows the new version value for the firmware component in the Version col-
+umn, and indicates the firmware transition is now over with a value of completed in the State column:
+
+[basecm11->device]% firmware -n node001 status
+Device Filename         Component                 Version               State      Progress Result
+-------- -------------- ------------------------- -------------------------------- -------- -------------------
+node001                 CPLDMB_0                  0.2.1.0               current    N/A
+14.5 BIOS And Firmware Management                                                             741
+
+node001                   CPLDMID_0                  0.2.1.0               current     N/A
+node001                   EROT_BIOS_0                00.04.0020.0000_n00   current     N/A
+node001                   EROT_BMC_0                 00.04.0020.0000_n00   current     N/A
+node001                   HostBIOS_0                 01.00.00              current     N/A
+node001                   HostBMC_0                  23.00.00              current     N/A
+node001                   PCIeRetimer_0              1.30.0                current     N/A
+node001                   PCIeRetimer_1              1.30.0                current     N/A
+node001                   PCIeSwitch_0               0.0.1                 current     N/A
+node001                   PCIeSwitch_1               1.0.1                 current     N/A
+node001                   PSU_0                      0202.0200.0200        current     N/A
+node001                   PSU_1                      0202.0200.0200        current     N/A
+node001                   PSU_2                      0202.0200.0200        current     N/A
+node001                   PSU_3                      0202.0201.0202        current     N/A
+node001                   PSU_4                      0202.0201.0203        current     N/A
+node001                   PSU_5                      0202.0200.0200        current     N/A
+node001   nvfw_...fwpkg   HGX_FW_BMC_0               HGX-22.10-1-rc44      completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_ERoT_BMC_0          00.02.0134.0000_n00   completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_ERoT_FPGA_0         00.02.0134.0000_n00   completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_ERoT_NVSwitch_0     00.02.0134.0000_n00   completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_ERoT_NVSwitch_1     00.02.0134.0000_n00   completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_ERoT_NVSwitch_2     00.02.0134.0000_n00   completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_ERoT_NVSwitch_3     00.02.0134.0000_n00   completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_ERoT_PCIeSwitch_0   00.02.0134.0000_n00   completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_FPGA_0              2.2C                  completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_GPU_SXM_1           96.00.74.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_GPU_SXM_2           96.00.74.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_GPU_SXM_3           96.00.74.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_GPU_SXM_4           96.00.74.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_GPU_SXM_5           96.00.74.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_GPU_SXM_6           96.00.74.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_GPU_SXM_7           96.00.74.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_GPU_SXM_8           96.00.74.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_NVSwitch_0          96.10.3F.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_NVSwitch_1          96.10.3F.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_NVSwitch_2          96.10.3F.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_NVSwitch_3          96.10.3F.00.01        completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_PCIeRetimer_0       2.7.9                 completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_PCIeRetimer_1       2.7.9                 completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_PCIeRetimer_2       2.7.9                 completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_PCIeRetimer_3       2.7.9                 completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_PCIeRetimer_4       2.7.9                 completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_PCIeRetimer_5       2.7.9                 completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_PCIeRetimer_6       2.7.9                 completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_PCIeRetimer_7       2.7.9                 completed   N/A   success: activated
+node001   nvfw_...fwpkg   HGX_FW_PCIeSwitch_0        1.7.5F                completed   N/A   success: activated
+
+A DGX GB200 Firmware Update: Procedures to upgrade DGX firmware components on the DGX
+GB200 hardware can be carried out after the hardware components (the compute trays, NVLink switch
+trays, and power shelves) are seen as being up in BCM. The procedure generally follows the firmware
+upgrade outlined for DGX H100 hardware (page 735). More details specific to the GB200 hardware can
+be found at:
+    https://docs.nvidia.com/mission-control/docs/rack-bring-up-install/2.0.0/rack-firmware-update.
+html#.
+742                                                                            Day-to-day Administration
+
+14.6     Hardware Match Check With The hardware-profile Data Producer
+Often a large number of identical nodes may be added to a cluster. In such a case it is a good practice to
+check that the hardware matches what is expected. This can be done easily as follows:
+  1. The new nodes, say node129 to node255, are committed to a newly-created category newbunch as
+     follows (output truncated):
+
+       [root@basecm11 ~]# cmsh -c "category add newbunch; commit"
+       [root@basecm11 ~]# for i in {129..255}
+       > do
+       > cmsh -c "device; set node00$i category newbunch; commit"
+       > done
+       Successfully committed 1 Devices
+       Successfully committed 1 Devices
+
+       The preceding loop is easy to construct, and works, but it is quite slow for larger clusters, due to
+       the time wasted in opening up cmsh and carrying out a commit command during each iteration of
+       the for loop.
+       For larger clusters the offending for loop can be replaced with a more elegant, but slightly trickier:
+       (echo device;
+        for i in {129..255}; do
+        echo "set node00$i category newbunch"
+        done
+        echo "commit") | cmsh
+
+  2. The hardware profile of one of the new nodes, say node129, is saved into the category newbunch.
+     This is done using the node-hardware-profile health check script:
+
+       Example
+
+       [root@basecm11 ~]# /cm/local/apps/cmd/scripts/healthchecks/node-hardware-profile -n node129 -s newbunch
+
+       The profile is intended to be the reference hardware against which all the other nodes should
+       match, and is saved under the directory /cm/shared/apps/cmd/hardware-profiles/, and further
+       under the directory name specified by the -s option, which in this case is newbunch.
+  3. The hardware-profile data producer (section 10.2.10) can then be enabled, and the sampling
+     frequency set as follows:
+       [root@basecm11 ~]# cmsh
+       [basecm11]% monitoring setup use hardware-profile
+       [basecm11->monitoring->setup[hardware-profile]]% set interval 600; set disabled no; commit
+
+       The hardware-profile data producer should also be set to the category newbunch created in the
+       earlier step. This can be done by creating a category group within the nodeexecutionfilters
+       submode. Within that group, categories can be set for where the hardware check is to run. For the
+       example, it is just run on one category, newbunch:
+
+       [basecm11->monitoring->setup[hardware-profile]]% nodeexecutionfilters
+       [basecm11->...-profile]->nodeexecutionfilters]% add category filterhwp
+       [basecm11->...-profile]->nodeexecutionfilters*[filterhwp*]]% set categories newbunch
+       [basecm11->...-profile]->nodeexecutionfilters*[filterhwp*]]% commit
+
+  4. CMDaemon then automatically alerts the administrator if one of the nodes does not match the
+     hardware of that category during the first automated check. In the unlikely case that the reference
+     node is itself faulty, then that will also be obvious because all—or almost all, if more nodes are
+     faulty—of the other nodes in that category will then be reported “faulty” during the first check.
+14.7 Serial Over LAN Console Access                                                                      743
+
+14.7    Serial Over LAN Console Access
+Direct console access to nodes is not always possible. Other possibilities to access the node are:
+
+  1. SSH access via an ssh client. This requires that an ssh server runs on the node and that it is
+     accessible via the network. Access can be via one of the following options:
+
+        • a regular SSH client, run from a bash shell
+        • via an ssh command run from the device mode of cmsh
+        • via an ssh terminal launched from Base View via the navigation path:
+           Devices > Nodes > node > Connect > ssh.
+
+  2. Remote shell via CMDaemon. This is possible if CMDaemon is running on the node and accessi-
+     ble via Base View or cmsh.
+
+        • In Base View, An interactive root shell session can be started up on a node via the navigation
+          path:
+           Devices > Nodes > node > Connect > Root shell.
+           This session is connected to the node via CMDaemon, and runs bash by default.
+        • For cmsh, in device mode, running the command rshell node001 launches an interactive
+          bash session connected to node001 via CMDaemon.
+
+  3. Connecting via a serial over LAN console. If a serial console is configured, then a serial over LAN
+     (SOL) console can be accessed from cmsh (rconsole).
+
+   Item 3 in the preceding list, SOL access, is a useful low-level access method that is covered next more
+thoroughly with:
+
+   • some background notes on serial over LAN console access (section 14.7.1)
+
+   • the configuration of SOL with Base View (section 14.7.2)
+
+   • the configuration of SOL with cmsh (section 14.7.3)
+
+   • the conman SOL logger and viewer (section 14.7.4)
+
+14.7.1 Background Notes On Serial Console And SOL
+Serial ports are data ports that can usually be enabled or disabled for nodes in the BIOS.
+    If the serial port of a node is enabled, it can be configured in the node kernel to redirect a console
+to the port. The serial port can thus provide what is called serial console access. That is, the console
+can be viewed using a terminal software such as minicom (in Linux) or Hyperterminal (in Windows)
+on another machine to communicate with the node via the serial port, using a null-modem serial cable.
+This has traditionally been used by system administrators when remote access is otherwise disabled, for
+example if ssh access is not possible, or if the TCP/IP network parameters are not set up right.
+    While traditional serial port console access as just described can be useful, it is inconvenient, because
+of having to set arcane serial connection parameters, use the relatively slow serial port and use a special
+serial cable. Serial Over LAN (SOL) is a more recent development of serial port console access, which
+uses well-known TCP/IP networking over a faster Ethernet port, and uses a standard Ethernet cable.
+SOL is thus generally more convenient than traditional serial port console access. The serial port DB-9 or
+DB-25 connector and its associated 16550 UART chip rarely exist on modern servers that support SOL,
+but they are nonetheless usually implied to exist in the BIOS, and can be “enabled” or “disabled” there,
+thus enabling or disabling SOL.
+    SOL is a feature of the BMC (Baseboard Management Controller) for IPMI 2.0 and iLO. For DRAC,
+CIMC, and Redfish, SOL via IPMI is used. SOL is enabled by configuring the BMC BIOS. When enabled,
+744                                                                          Day-to-day Administration
+
+data that is going to the BMC serial port is sent to the BMC LAN port. SOL clients can then process the
+LAN data to display the console. As far as the node kernel is concerned, the serial port is still just
+behaving like a serial port, so no change needs to be made in kernel configuration in doing whatever
+is traditionally done to configure serial connectivity. However, the console is now accessible to the
+administrator using the SOL client on the LAN.
+    SOL thus allows SOL clients on the LAN to access the Linux serial console if
+
+  1. SOL is enabled and configured in the BMC BIOS
+
+  2. the serial console is enabled and configured in the node kernel
+
+  3. the serial port is enabled and configured in the node BIOS
+
+   The BMC BIOS, node kernel, and node BIOS therefore all need to be configured to implement SOL
+console access.
+
+Background Notes: BMC BIOS Configuration
+The BMC BIOS SOL values are usually enabled and configured as a submenu or pop-up menu of the
+node BIOS. These settings must be manually made to match the values in BCM, or vice versa.
+   During a factory reset of the node, it is likely that a SOL configuration in BCM will no longer match
+the configuration on the node BIOS after the node boots. This is because BCM cannot configure these.
+This is in contrast to the IP address and user authentication settings of the BMC (section 3.7), which
+BCM is able to configure on reboot.
+
+Background Notes: Node Kernel Configuration
+Sections 14.7.2 and 14.7.3 explain how SOL access configuration is set up for the node kernel using
+Base View or cmsh. SOL access configuration on the node kernel is serial access configuration on the
+node kernel as far as the system administrator is concerned; the only difference is that the word “serial”
+is replaced by “SOL” in BCM’s Base View and cmsh front ends to give a cluster perspective on the
+configuration.
+
+Background Notes: Node BIOS Configuration
+Since BIOS implementations vary, and serial port access is linked with SOL access in various ways by
+the BIOS designers, it is not possible to give short and precise details on how to enable and configure
+them. The following rules-of-thumb, if followed carefully, should allow most BMCs to be configured for
+SOL access with BCM:
+
+   • Serial access, or remote access via serial ports, should be enabled in the BIOS, if such a setting
+     exists.
+
+   • The node BIOS serial port settings should match the node configuration SOL settings (sec-
+     tion 14.7.3). That means, items such as “SOL speed”, “SOL Flow Control”, and “SOL port” in
+     the node configuration must match the equivalent in the node BIOS. Reasonable values are:
+
+        – SOL speed: 115200bps. Higher speeds are sometimes possible, but are more likely to have
+          problems.
+        – SOL flow control: On. It is however unlikely to cause problems if flow control is off in both.
+        – SOL port: COM1 (in the BIOS serial port configuration), corresponding to ttyS0 (in x86_64)
+          or ttyAMA0 (in aarch64) in the node kernel serial port configuration. Alternatively, COM2,
+          corresponding to ttyS1 or ttyAMA1. Sometimes, the BIOS configuration display indicates
+          SOL options with options such as: “COM1 as SOL”, in which case such an option should be
+          selected for SOL connectivity.
+        – Terminal type: VT100 or ANSI.
+14.7 Serial Over LAN Console Access                                                                  745
+
+   • If there is an option for BIOS console redirection after BIOS POST, it should be disabled.
+
+   • If there is an option for BIOS console redirection before or during BIOS POST, it should be enabled.
+
+   • The administrator should be aware that the BMC LAN traffic, which includes SOL traffic, can
+     typically run over a dedicated NIC or over a shared NIC. The choice of dedicated or shared is
+     toggled, either in the BIOS, or via a physical toggle, or both. If BMC LAN traffic is configured to
+     run on the shared NIC, then just connecting a SOL client with an Ethernet cable to the dedicated
+     BMC NIC port shows no console.
+
+   • The node BIOS values should manually be made to match the values in BCM, or vice versa.
+
+14.7.2 SOL Console Configuration With Base View
+In Base View, SOL configuration settings can be carried out per image via the navigation path
+Provisioning > Software Images > image > Edit > Settings
+    If the Enable SOL option is set to Yes then the kernel option to make the Linux serial console acces-
+sible is used after the node is rebooted.
+    This means that if the serial port and SOL are enabled for the node hardware, then after the node
+reboots the Linux serial console is accessible over the LAN via an SOL client.
+    If SOL is correctly configured in the BIOS and in the image, then access to the Linux serial console
+is possible via the minicom serial client running on the computer (from a bash shell for example), or via
+the rconsole serial client running in cmsh.
+
+14.7.3 SOL Console Configuration And Access With cmsh
+In cmsh, the serial console kernel option for a software image can be enabled within the softwareimage
+mode of cmsh. For the default image of default-image, this can be done as follows:
+
+Example
+
+[root@basecm11 ~]# cmsh
+[basecm11]% softwareimage use default-image
+
+[basecm11->softwareimage[default-image]]% set enablesol yes
+[basecm11->softwareimage*[default-image*]]% commit
+
+   The SOL settings for a particular image can be seen with the show command:
+[basecm11->softwareimage[default-image]]% show | grep SOL
+Parameter                      Value
+------------------------------ --------------
+Enable SOL                     yes
+SOL Flow Control               yes
+SOL Port                       ttyS1
+SOL Speed                      115200
+
+Values can be adjusted if needed with the set command. The value for SOL Port is normally ttyS0 for
+x86_64 images, and ttyAMA0 for arch64 images.
+   On rebooting the node, the new values are used.
+   To access a node via an SOL client, the node can be specified from within the device mode of cmsh,
+and the rconsole command run on cmsh on the head node:
+
+Example
+
+[root@basecm11 ~]# cmsh
+[basecm11]% device use node001
+[basecm11->device[node001]]% rconsole
+746                                                                          Day-to-day Administration
+
+ screen cleared and the following conman output is displayed:
+===============================================================================
+conman
+To exit IPMI SOL, type <ENTER> "&" "."
+===============================================================================
+
+<ConMan> Connection to console [node001] opened.
+
+If at this point, there is no further response in conman on the console after pressing the <ENTER> key,
+then there is a communication failure, probably due to a misconfigured communication parameter. This
+could happen, for example, if the serial port ttyS1 has been set, but the node is connected on ttyS0.
+Setting the value of SOL Port to ttyS0 and rebooting the node to pick up the new value, would solve
+that issue, so that pressing the <ENTER> key, would display the node console:
+
+Example
+
+Ubuntu 18.04.2 LTS node001 ttyS0
+
+node001 login:
+
+14.7.4 The conman Serial Console Logger And Viewer
+In BCM, the console viewer and logger service conman is used to connect to an SOL console and log the
+console output.
+    If the “Enable SOL” option in Base View, or if the enablesol parameter in cmsh is enabled for the
+software image, then the conman configuration is written out and the conman service is started.
+
+Logging The Serial Console
+The data seen at the serial console is then logged via SOL to the head node after reboot. For each node
+that has logging enabled, a log file is kept on the head node. For example, for node001 the log file would
+be at /var/log/conman/node001.log. To view the logged console output without destroying terminal
+settings, using less with the -R option is recommended, as in: less -R /var/log/conman/node001.log.
+
+Using The Serial Console Interactively
+Viewing quirk during boot: In contrast to the logs, the console viewer shows the initial booting stages
+of the node as it happens. There is however a quirk the system administrator should be aware of:
+    Normally the display on the physical console is a copy of the remote console. However, during boot,
+after the remote console has started up and been displaying the physical console for a while, the physical
+console display freezes. For the Linux 2.6 kernel series, the freeze occurs just before the ramdisk is run,
+and means that the display of the output of the launching init.d services is not seen on the physical
+console (figure 14.2).
+14.7 Serial Over LAN Console Access                                                                 747
+
+
+
+
+                       Figure 14.2: Physical Console Freeze During SOL Access
+
+   The freeze is only a freeze of the display, and should not be mistaken for a system freeze. It occurs
+because the kernel is configured during that stage to send to only one console, and that console is the
+remote console. The remote console continues to display its progress (figure 14.3) during the freeze of
+the physical console display.
+748                                                                         Day-to-day Administration
+
+
+
+
+      Figure 14.3: Remote Console Continues During SOL Access During Physical Console Freeze
+
+  Finally, just before login is displayed, the physical console once more (figure 14.4) starts to display
+what is on the remote console (figure 14.5).
+14.7 Serial Over LAN Console Access                                                   749
+
+
+
+
+               Figure 14.4: Physical Console Resumes After Freeze During SOL Access
+
+
+
+
+                         Figure 14.5: Remote Console End Display After Boot
+
+   The physical console thus misses displaying several parts of the boot progress.
+750                                                                            Day-to-day Administration
+
+Exit sequence: The conman console viewer session can be exited with the sequence &. (the last entry
+in the sequence being a period). Strictly speaking, the &. sequence must actually be preceded by an
+<ENTER>.
+
+The console buffer issue when accessing the remote console: A feature of SOL console clients is that
+the administrator is not presented with any text prompt from the node that is being accessed. This is
+useful in some cases, and can be a problem in others.
+    An example of the issue is the case where the administrator has already logged into the console and
+typed in a command in the console shell, but has no intention of pressing the <ENTER> key until some
+other tasks are first carried out. If the connection breaks at this point, then the command typed in is
+held in the console shell command buffer, but is not displayed when a remote serial connection is re-
+established to the console—the previously entered text is invisible to the client making the connection.
+A subsequent <ENTER> would then attempt to execute the command. This is why an <ENTER> is not
+sent as the last key sequence during automated SOL access, and it is left to the administrator to enter
+the appropriate key strokes.
+    To avoid commands in the console shell buffer inadvertently being run when taking over the console
+remotely, the administrator can start the session with a <CTRL>-u to clear out text in the shell before
+pressing <ENTER>.
+
+
+14.8    Managing Raw Monitoring Data
+From NVIDIA Base Command Manager version 8.0 onward, the raw monitoring data values are stored
+as binary data under /var/spool/cmd/monitoring instead of as binary data within MySQL or MariaDB.
+The reason behind this change was to significantly increase performance. The monitoring subsystem in
+BCM was thoroughly rewritten for this change.
+
+14.8.1 Monitoring Subsystem Disk Usage With The monitoringinfo --storage Option
+The disk usage by the monitoring subsystem can be viewed using the monitoringinfo command with
+the --storage option:
+
+Example
+
+[basecm11->device]% monitoringinfo master --storage
+Storage                     Elements   Disk size    Usage    Free disk
+--------------------------- ---------- ------------ -------- ------------
+Mon::Storage::Engine        1,523      1.00 GiB     1.28%    14.1 GiB
+Mon::Storage::Message       1          16.0 MiB     0.000%   -
+Mon::Storage::RepositoryId 1,528       47.7 KiB     100.0%   -
+
+   The Engine component stores the raw monitoring data. It grows in 1GB increments each time its
+usage reaches 100%.
+
+14.8.2 Estimating The Required Size Of The Storage Device
+The final size of the monitoring directory can be estimated with the script cm-monitoring-disk-usage.
+py.
+    The size estimate assumes that there are no changes in configuration, such as enabling advanced
+metrics for jobs, or increasing the maximum number of labeled entities, or large numbers of running
+jobs.
+    The size estimate value is the maximum value it will take if the cluster runs forever. It is therefore an
+over-estimate in practice.
+
+Example
+14.8 Managing Raw Monitoring Data                                                                    751
+
+[root@basecm11 ~]# /cm/local/apps/cmd/scripts/monitoring/cm-monitoring-disk-usage.py
+Number of used entities:      10
+Number of used measurables:   286
+Number of measurables:        286
+Number of data producers:     98
+Number of consolidators:      2
+
+Current monitoring directory: /var/spool/cmd/monitoring
+Monitoring directory size:    1.024 GB
+Maximal directory size:       1.409 GB
+
+14.8.3 Moving Monitoring Data Elsewhere
+A procedure to move monitoring data from the default /var/spool/cmd/monitoring/ directory to a
+new directory is as follows:
+
+  1. A new directory in which monitoring should be saved is picked.
+     The block storage device for the directory should not be a shared DAS (Direct Attached Storage,
+     such as a locally attached drive) or a NAS (Network Attached Storage, such as NFS or Lustre
+     which work over a network connection). That is because if there is an outage, then:
+
+        • If such a DAS storage becomes unavailable at some time, then CMDaemon assumes that no
+          monitoring data values exist, and creates an empty data file on the local storage. If the DAS
+          storage comes back and is mounted again, then it hides the underlying files, which would
+          lead to discontinuous values and related issues.
+        • If such a NAS storage is used, then an outage of the NAS can make CMDaemon unresponsive
+          as it waits for input and output. In addition, when CMDaemon starts with a NAS storage,
+          and if the NAS is unavailable for some reason, then an inappropriate mount may happen as
+          in the DAS storage case, leading to discontinuous values and related issues.
+
+  2. The MonitoringPath directive (page 890) is given the new directory as its value.
+
+  3. CMDaemon is stopped (systemctl stop cmd).
+
+  4. The /var/spool/cmd/monitoring/ directory is moved to the new directory.
+
+  5. CMDaemon is restarted (systemctl start cmd).
+
+14.8.4 Reducing Monitoring Data By Reducing Samples
+Options to reduce the amount of monitoring data gathered include reducing the Maximal age and
+Maximal samples for data producers (section 10.4.1) to smaller, but still non-zero values. After re-
+initializing the monitoring data collection, so that existing data is removed, the values reported by the
+cm-monitoring-disk-usage.py script (section 14.8.2) then show the new storage estimates for the mon-
+itoring data.
+
+14.8.5 Deleting All Monitoring Data
+A procedure to delete all monitoring data from the default /var/spool/cmd/monitoring/ directory is
+as follows:
+
+  1. The CMDaemon service on all nodes can be stopped by running the following on the active head
+     node:
+     pdsh -g all systemctl stop cmd
+
+
+  2. On both head nodes, the monitoring data is removed with:
+752                                                                        Day-to-day Administration
+
+                       rm -f /var/spool/cmd/monitoring/*
+                       rm -f /var/spool/cmd/backup/*/var/spool/cmd/monitoring/*
+
+  3. On both head nodes, the associated database tables for the CMDaemon user are cleared with a
+     MySQL session run on each head node.
+      The CMDaemon database user is cmdaemon by default, but the value can be checked with a grep
+      on the cmd.conf file:
+
+      [root@basecm11 ~]# grep ^DBUser /cm/local/apps/cmd/etc/cmd.conf
+      DBUser = "cmdaemon"
+
+      Similarly, the password for the cmdaemon user can be found with a grep as follows:
+
+      [root@basecm11 ~]# grep ^DBPass /cm/local/apps/cmd/etc/cmd.conf
+      DBPass = "slarti8813bartfahrt"
+
+      The monitoring measurables can then be deleted by running a session on each head node as fol-
+      lows:
+
+      Example
+
+      [root@basecm11 ~]# mysql -ucmdaemon -p
+      Enter password:
+      Welcome to the MariaDB monitor. Commands end with ; or \g.
+      Your MariaDB connection id is 2909
+      Server version: 5.5.56-MariaDB MariaDB Server
+
+      Copyright (c) 2000, 2017, Oracle, MariaDB Corporation Ab and others.
+
+      Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+      MariaDB [(none)]> use cmdaemon;
+      Database changed
+      MariaDB [cmdaemon]> truncate MonitoringMeasurables;
+      MariaDB [cmdaemon]> truncate MonitoringMeasurableMetrics;
+      MariaDB [cmdaemon]> truncate MonitoringMeasurableHealthChecks;
+      MariaDB [cmdaemon]> truncate MonitoringMeasurableEnums;
+      MariaDB [cmdaemon]> truncate EntityMeasurables;
+      MariaDB [cmdaemon]> truncate EnumMetricValues;
+      MariaDB [cmdaemon]> truncate LabeledEntities;
+      MariaDB [cmdaemon]> truncate JobInformation;
+      MariaDB [cmdaemon]> exit
+      repeat on other head node
+
+  4. On both head nodes, CMDaemon can then be restarted with:
+     systemctl start cmd
+
+  5. On the active head node, after the command:
+     cmha status
+     shows all is OK, the CMDaemon service can be started on all regular nodes again. The OK state
+     should be achieved in about 15 seconds.
+      The CMDaemon service is started with, for example:
+      pdsh -g computenode systemctl start cmd
+14.9 Node Replacement                                                                                  753
+
+14.9    Node Replacement
+To replace an existing node with a new node, the node information can be updated via cmsh.
+    If the new MAC address is known, then it can set that for the node. If the MAC address is not known,
+then the existing entry can be cleared.
+    If the MAC address is not known ahead of time, then the node name for the machine should be
+selected when it is provisioning for the first time. The steps for a new node node031 would be as follows:
+Example
+[root@basecm11 ~]# cmsh
+[basecm11]% device use node0031
+if new mac address is known, then:
+[basecm11->device[node031]]% set mac <new mac address>
+else if new mac address is not known:
+[basecm11->device[node031]]% clear mac
+the changed setting in either case must be committed:
+[basecm11->device[node031]]% commit
+
+    If the disk is the same size as the one that is being replaced, and everything else matches up, then
+this should be all that needs to be done
+    There is more information on the node installing system in section 5.4. How to add a large number
+of nodes at a time efficiently is described in that section. The methods used can include the newnodes
+command of cmsh (page 257) and the Nodes Identification resource of Base View (page 261).
+
+
+14.10     Ansible And NVIDIA Base Command Manager
+This section describes using Ansible with BCM. Using Ansible to install NVIDIA Base Command Man-
+ager is described in section 3.4 of the Installation Manual.
+
+14.10.1 An Overview Of Ansible
+Ansible is a popular automated configuration management software.
+   The BCM administrator is expected to have some experience already with Ansible. The basic con-
+cepts are covered in the official Ansible documentation at https://docs.ansible.com/ansible/latest/
+user_guide/basic_concepts.html, and further details are accessible from that site too.
+   As a reminder:
+
+   • Ansible is designed to administer groups of machines from an inventory of machines.
+   • An Ansible module is code, usually in Python, that is executed by Ansible to carry out Ansible
+     tasks, usually on a remote node. The module returns values.
+   • An Ansible playbook is a YAML file. The file declares a configuration that is to be executed (“the
+     playbook is followed”) on selected machines. The execution is usually carried out over SSH, by
+     placing modules on the remote machine.
+   • Traditionally, official Ansible content was obtained as a part of milestone releases of Ansible En-
+     gine, (the Red Hat version of Ansible for the enterprise).
+   • Since Ansible version 2.10, the official way to distribute content is via Ansible content collections.
+     Collections are composed of Ansible playbooks, modules, module utilities and plugins. The col-
+     lection is a formatted set of tools used to achieve automation with Ansible.
+   • The official Ansible list of collections is at https://docs.ansible.com/ansible/latest/
+     collections/index.html#list-of-collections. At the time of writing of this section (March
+     2022) there were 100 collections.
+   • Community-supported collections are also available, at galaxy.ansible.com.
+754                                                                       Day-to-day Administration
+
+Picking Up The BCM Ansible Collections
+In particular, the web interface at https://galaxy.ansible.com/brightcomputing shows the updated
+list of BCM Ansible collections.
+     From version 9.1 onward of BCM, the BCM Ansible collection naming scheme has been changed
+so that the name now indicates the BCM version number. This now makes it simpler for the cluster
+administrator to choose the right Ansible collection.
+     For example, to install the latest version of the BCM Ansible collection for a NVIDIA Base Command
+Manager 11 cluster, the following command can now be run:
+[root@basecm11 ~]# ansible-galaxy collection install brightcomputing.bcm110
+
+14.10.2 A Simple Playbook Example
+In this section, a playbook from the BCM collection is run.
+
+Preparations
+To start with, Python is loaded, and Ansible installed:
+
+[root@basecm11 ~]# module load python3
+[root@basecm11 ~]# pip install ansible
+
+Running A Simple Playbook
+The directory /cm/local/examples/cmd/ansible has several BCM Ansible playbook examples.
+   The Ansible playbook to add a user can be run. The playbook is simply:
+
+[root@basecm11 ~]# cat /cm/local/examples/cmd/ansible/add-user.yaml
+---
+- hosts: all
+  gather_facts: false
+  tasks:
+  collections:
+- brightcomputing.bcm110
+  tasks:
+  - name: create test-user
+    user:
+      name: test-user
+      password: test-user-password
+      profile: readonly
+
+    The latest NVIDIA Base Command Manager 11-compatible version of the BCM Ansible collection is
+at https://galaxy.ansible.com/brightcomputing/bcm110. It can be installed with the ansible-galaxy
+tool from the galaxy.ansible.com repository directly with:
+[root@basecm11 ~]# ansible-galaxy collection install brightcomputing.bcm110
+
+Documentation For The BCM Collection
+The brightcomputing.bcm110 documentation for modules can be explored using ansible-doc in the
+usual way, using the namespace. For example, for the user module in the brightcomputing.bcm110
+namespace, this would be (output truncated):
+
+[root@basecm11 ~]# ansible-doc brightcomputing.bcm110.user
+> BRIGHTCOMPUTING.BCM110.USER
+> (/root/.ansible/collections/ansible_collections/brightcomputing/bcm110/plugins/modules/user.py)
+
+        User
+
+ADDED IN: version 9.2.0 of brightcomputing.bcm110
+14.10 Ansible And NVIDIA Base Command Manager                                                          755
+
+
+
+  * note: This module has a corresponding action plugin.
+
+OPTIONS (= is mandatory):
+
+- ID
+          User ID number
+          [Default: (null)]
+          type: str
+
+- cloneFrom
+        The id or name of the entity that the new entity will be cloned from.
+         (take effect only at entity creation)
+        [Default: ]
+        type: str
+
+- email
+...
+
+   The list of modules in the brightcomputing.bcm110 collection can be viewed with ansible-doc -l
+brightcomputing.bcm110.
+   Almost all the modules are available as a pair. For such a pair, one module out of the pair is to query
+the attributes of the entity being dealt with by the pair, while the other module is to set the attributes.
+
+Running The Ansible Playbook
+The add-user playbook can now be run with:
+
+Example
+
+[root@basecm11 ~]# ansible-playbook -ilocalhost, /cm/local/examples/cmd/ansible/add-user.yaml
+
+PLAY [all]
+*********************************************************************************************
+
+TASK [create test-user]
+*********************************************************************************************
+changed: [localhost]
+
+PLAY RECAP
+*********************************************************************************************
+localhost                  : ok=1    changed=1    unreachable=0    failed=0    skipped=0
+rescued=0    ignored=0
+
+
+   The YAML code shows a user should be created after execution of the playbook. If unsure, the
+playbook can be run again. This should do no harm since well-formed playbooks are idempotent.
+   The new list of users can be verified with:
+[root@basecm11 ~]# cmsh -c "user list"
+Name (key)       ID (key)         Primary group    Secondary groups
+---------------- ---------------- ---------------- ----------------
+cmsupport        1000             cmsupport
+test-user        1001             test-user
+756                                                                         Day-to-day Administration
+
+14.10.3    An Intermediate Playbook Example: Setting Up A Cluster For Demonstration
+           Purposes
+The simple playbook in the preceding section has the advantage of being a quick way for the adminis-
+trator to be reasonably sure that Ansible is running as it should be.
+    An administrator who is intending to use Ansible is typically going to need to be more familiar with
+how Ansible playbooks can be used to define BCM infrastructure.
+    This section (14.10.3) and the next (14.10.4) aim to provide this familiarity. They should be a guide
+for users when they go about defining their own BCM infrastructure with Ansible, as well as a model
+for how to carry out Ansible tasks for BCM.
+    The example session in this section (section 14.10.3) is about a cluster administrator who wishes to
+prepare a playbook so that the default image is updated, and then have the cluster set up some new
+objects with default values. This is useful for testing out changes in the new objects. The idea being
+that the administrator has up-to-date nodes with default settings in the new objects, and which work
+to begin with. That makes the new objects suitable for demonstrations and for making changes to see
+how it affects the standard settings. It also provides the convenience of being able to refer back to the
+working defaults in the original objects if things go wrong with the demonstration objects.
+    The tasks to bring the cluster to the “demo” state are described next.
+
+Cloning The Image
+The administrator now clones the default image. The idea being that further changes can be made
+on the cloned image later on, with the default image instance remaining unchanged, and available for
+comparison.
+    The YAML example clone-software-image.yaml provided with BCM can be displayed and used
+to carry out the cloning as shown in the following session:
+
+[root@basecm11 ~]# cat /cm/local/examples/cmd/ansible/clone-software-image.yaml
+---
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: clone a software image
+      brightcomputing.bcm110.software_image:
+        name: cloned-image
+        cloneFrom: default-image
+        path: /cm/images/cloned-image
+
+[root@basecm11 ~] ansible-playbook -i localhost, /cm/local/examples/cmd/ansible/clone-software-image.yaml
+
+Cloning The Category
+A clone of the default category, democategory, can be built with the brightcomputing.bcm110.category
+module:
+
+[root@basecm11 ~]# cat clonedefaultcat.yaml
+- hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: clone category
+      brightcomputing.bcm110.category:
+        name: democategory
+        cloneFrom: default
+[root@basecm11 ~] ansible-playbook -i localhost, clonedefaultcat.yaml
+14.10 Ansible And NVIDIA Base Command Manager                                                        757
+
+Setting The Software Image In The Cloned Category To Be The Cloned Image
+The software image in the cloned category can then be set to the cloned-image from earlier with:
+[root@basecm11 ~]# cat setimageincat.yaml
+- hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: set image in category
+      brightcomputing.bcm110.category:
+        name: democategory
+        softwareImageProxy:
+          parentSoftwareImage: cloned-image
+[root@basecm11 ~] ansible-playbook -i localhost, setimageincat.yaml
+
+Setting The Regular Nodes To Be In The Cloned Category
+The regular nodes node001 and node002 can be placed in the cloned category with:
+[root@basecm11 ~]# cat setcatofnodes.yaml
+- hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: list all nodes
+      brightcomputing.bcm110.node_info:
+        format: dict
+        include_id: false
+        for_update: true
+      register: result
+
+    - name: set head_node
+      set_fact:
+        all_nodes: "{{ result.nodes }}"
+
+    - name: assign compute nodes to cloned category
+      brightcomputing.bcm110.physical_node:
+        hostname: "{{ item }}"
+        mac: "{{ all_nodes[item].mac }}"
+        category: democategory
+      loop:
+        - node001
+        - node002
+[root@basecm11 ~] ansible-playbook -i localhost, setcatofnodes.yaml
+
+   Without using Ansible, and using cmsh directly instead, the preceding placement could be carried
+out with:
+[root@basecm11 ~] for i in {001..002}
+do cmsh -c "device use node$i; set category democategory; commit"
+done
+
+14.10.4    A More Complicated Playbook Example: Creating An Edge Site And Related
+           Properties
+This section provides a more complicated BCM Ansible collection-based playbook, and elaborates upon
+how it is used.
+    The collection is first shown as a whole in the following section. Then less obvious portions from it
+are explained, with the help of number labels, in the sections after that, starting on page 760.
+758                                                                     Day-to-day Administration
+
+The Collection
+The full collection is as follows:
+
+---
+- hosts: all
+  gather_facts: false
+  vars:
+    site:
+      name: test-site
+      secret: SECRET
+
+      director:
+        hostname: test-site-director
+        mac: 00:11:22:33:44:55
+        eth0_ip: 10.152.0.254
+        eth1_ip: 10.161.0.254
+
+      nodes:
+        - hostname: edge-node-01
+          mac: 00:11:22:33:44:01
+          eth0_ip: 10.161.0.1
+
+       - hostname: edge-node-02
+         mac: 00:11:22:33:44:02
+         eth0_ip: 10.161.0.2
+
+       - hostname: edge-node-03
+         mac: 00:11:22:33:44:03
+         eth0_ip: 10.161.0.3
+
+  pre_tasks:
+
+      - name: set compute nodes for site
+        set_fact:
+          site_compute_nodes: "{{nodes | map(attribute='hostname') | list}}"
+
+      - name: set nodes for site
+        set_fact:
+          site_nodes: "{{[director.hostname] + site_compute_nodes}}"
+
+  tasks:
+    # Network creation
+    - name: create an external network
+      brightcomputing.bcm110.network:
+        state: present
+        name: test-site-external_network
+        type: EDGE_EXTERNAL
+        baseAddress: 10.152.0.0
+        broadcastAddress: 10.152.255.255
+        netmaskBits: 16
+        domainName: test-site-external_network
+        management: true
+
+      - name: create an internal network
+        brightcomputing.bcm110.network:
+            state: present
+14.10 Ansible And NVIDIA Base Command Manager          759
+
+        type: EDGE_INTERNAL
+        name: test-site-internal_network
+        baseAddress: 10.161.0.0
+        broadcastAddress: 10.161.255.255
+        dynamicRangeStart: 10.161.16.0
+        dynamicRangeEnd: 10.161.19.255
+        netmaskBits: 16
+        domainName: test-site-internal_network
+        management: true
+        bootable: true
+
+   - name: create edge site software image
+     brightcomputing.bcm110.software_image:
+       name: my-software-image
+       path: /cm/images/my-software-image
+       cloneFrom: default-image
+
+   - name: create edge director category
+     brightcomputing.bcm110.category:
+       name: edge_director_category
+       softwareImageProxy:
+         parentSoftwareImage: my-software-image
+       fsmounts:
+         - device: $localnfsserver:/cm/shared
+           mountpoint: /cm/shared
+           filesystem: nfs
+         - device: $localnfsserver:/home
+           mountpoint: /home
+           filesystem: nfs
+       state: present
+
+   # Edge Director
+   - name: create director physical node
+     brightcomputing.bcm110.physical_node:
+       state: present
+       hostname: "{{director.hostname}}"
+       partition: base
+       interfaces_NetworkPhysicalInterface:
+         - name: eth0
+           ip: "{{ director.eth0_ip }}"
+           network: test-site-external_network
+         - name: eth1
+           ip: "{{ director.eth1_ip }}"
+           network: test-site-internal_network
+
+       category: edge_director_category
+       mac: "{{director.mac}}"
+       managementNetwork: test-site-external_network
+       provisioningInterface: eth0
+       installBootRecord: true
+       roles_EdgeDirectorRole:
+         - name: edge_director_role
+           openTCPPortsOnHeadNode: [636]
+           externallyVisibleIp: 0.0.0.0
+           externallyVisibleHeadNodeIp: 0.0.0.0
+760                                                                              Day-to-day Administration
+
+          roles_BootRole:
+            - name: boot_role
+              allowRamdiskCreation: true
+          roles_StorageRole:
+            - name: storage_role
+          roles_ProvisioningRole:
+            - name: provisioning_role
+              allImages: LOCALDISK
+
+      # Edge Nodes
+      - name: create edge nodes
+        brightcomputing.bcm110.physical_node:
+          hostname: "{{item.hostname}}"
+          softwareImageProxy:
+            parentSoftwareImage: default-image
+          interfaces_NetworkPhysicalInterface:
+            - name: eth0
+              ip: "{{item.eth0_ip}}"
+              network: test-site-internal_network
+          category: default
+          mac: "{{item.mac}}"
+          managementNetwork: test-site-internal_network
+          installBootRecord: false
+          provisioningInterface: eth0
+          partition: base
+        loop: "{{ nodes }}"
+
+      - name: add test edge site
+        brightcomputing.bcm110.edge_site:
+          name: "{{site.name}}"
+          secret: "{{site.secret}}"
+          address: Springfield
+          adminEmail: admin-west@email.com
+          city: San Francisco
+          contact: Admin
+          country: USA
+          notes: Note about the site
+          state: present
+          nodes: "{{site_nodes}}"
+
+Topmost Part
+- hosts: all #(1)
+  gather_facts: false #(2)
+
+  1. This is a standard Ansible playbook configuration item. It defines the group or host that the
+     playbook is run on.
+
+  2. Fact gathering is skipped here, because there is no need to use any facts that Ansible usually
+     gathers pre-playbook-run. As a bonus, skipping it makes execution faster.
+
+Pre_tasks Part
+The pre_tasks section could have been made a part of the tasks section. However, making it a separate
+section has the benefit of separating real action from simple fact definition:
+
+      - name: set compute nodes for site
+        set_fact:
+14.10 Ansible And NVIDIA Base Command Manager                                                         761
+
+        site_compute_nodes: "{{nodes | map(attribute='hostname') | list}}" #(1)
+
+    - name: set nodes for site
+      set_fact:
+        site_nodes: "{{[director.hostname] + site_compute_nodes}}" #(2)
+
+  1. In the preceding code, the Ansible templating capability is used to get the list of compute_nodes for
+     the site that is to be created. The hostname attribute is extracted from every element of the nodes
+     variable and then transformed into a list, and assigned to the site_compute_nodes variable.
+
+  2. The list that is created has all the nodes that are part of the site, which means the compute nodes
+     as well as the director.
+
+The Tasks Part
+External and internal networks configuration: The tasks section starts with networking definitions
+(tagged here with (1) and (2)). These are the external and internal networks that are needed for the edge
+site that is to be created.
+
+    - name: create an external network    #(1)
+      brightcomputing.bcm110.network:
+        state: present
+        name: test-site-external_network
+        type: EDGE_EXTERNAL
+        baseAddress: 10.152.0.0
+        broadcastAddress: 10.152.255.255
+        netmaskBits: 16
+        domainName: test-site-external_network
+        management: true
+
+    - name: create an internal network     #(2)
+      brightcomputing.bcm110.network:
+          state: present
+          type: EDGE_INTERNAL
+          name: test-site-internal_network
+          baseAddress: 10.161.0.0
+          broadcastAddress: 10.161.255.255
+          dynamicRangeStart: 10.161.16.0
+          dynamicRangeEnd: 10.161.19.255
+          netmaskBits: 16
+          domainName: test-site-internal_network
+          management: true
+          bootable: true
+
+   The possible values for each entity attribute can be seen by running the ansible-doc command:
+
+Example
+
+$ ansible-doc brightcomputing.bcm110.network
+
+Director creation: A category must exist for the edge director, or must be created before the director
+can be created. The following snippet takes care of that:
+
+    - name: create edge site software image
+      brightcomputing.bcm110.software_image:
+        name: my-software-image
+        path: /cm/images/my-software-image
+762                                                                         Day-to-day Administration
+
+          cloneFrom: default-image    #(1)
+
+      - name: create edge director category
+        brightcomputing.bcm110.category:
+          name: edge_director_category
+          softwareImageProxy:
+            parentSoftwareImage: my-software-image       #(2)
+          fsmounts:     #(3)
+            - device: $localnfsserver:/cm/shared
+              mountpoint: /cm/shared
+              filesystem: nfs
+            - device: $localnfsserver:/home
+              mountpoint: /home
+              filesystem: nfs
+          state: present     #(4)
+
+  1. The cloneFrom attribute is used to create the new software image from the existing one, to avoid
+     copying over all the values that are part of the original image. The default-image is used here,
+     since it is guaranteed to be defined in a new cluster.
+       The cloneFrom attribute only takes effect when the resource is not defined. This means that if the
+       software image is already present, then using cloneFrom has no effect. Removing the image allows
+       it to be re-created again using the cloneFrom attribute.
+
+  2. The declared software image (here it is my-software-image) is then used to define the director
+     category.
+
+  3. The edge directory category attributes in the snippet are standard values that are normally as-
+     signed to a director category that is to be used by director nodes.
+
+  4. The default value for state is present, so the task has the same behavior if the state field is left
+     out.
+
+Values for the director node: The edge director node values can now be set
+
+      - name: create director physical node
+        brightcomputing.bcm110.physical_node:
+          state: present
+          hostname: "{{director.hostname}}"
+          partition: base
+          interfaces_NetworkPhysicalInterface:
+            - name: eth0
+              ip: "{{ director.eth0_ip }}"
+              network: test-site-external_network
+            - name: eth1
+              ip: "{{ director.eth1_ip }}"
+              network: test-site-internal_network
+
+          category: edge_director_category
+          mac: "{{director.mac}}"
+          managementNetwork: test-site-external_network
+          provisioningInterface: eth0
+          installBootRecord: true
+          roles_EdgeDirectorRole: # (1)
+            - name: edge_director_role
+              openTCPPortsOnHeadNode: [636]
+14.10 Ansible And NVIDIA Base Command Manager                                                          763
+
+            externallyVisibleIp: 0.0.0.0
+            externallyVisibleHeadNodeIp: 0.0.0.0
+        roles_BootRole:
+          - name: boot_role
+            allowRamdiskCreation: true
+        roles_StorageRole:
+          - name: storage_role
+        roles_ProvisioningRole:
+          - name: provisioning_role
+            allImages: LOCALDISK
+
+In the preceding snippet, values are set for the physical node so that it functions correctly as a director
+on an edge site.
+
+  1. The director, just like the edge nodes, is just a physical node, with the role EdgeDirectorRole
+     assigned to it, along with other relevant roles.
+
+The edge (compute) nodes definition:
+
+  1. In the following snippet, the looping mechanism defines a physical node that corresponds to each
+     declared compute node.
+
+   Each edge node belongs to the correct network.
+
+    - name: create edge nodes
+      brightcomputing.bcm110.physical_node:
+        hostname: "{{item.hostname}}"
+        softwareImageProxy:
+          parentSoftwareImage: default-image
+        interfaces_NetworkPhysicalInterface:
+          - name: eth0
+            ip: "{{item.eth0_ip}}"
+            network: test-site-internal_network
+        category: default
+        mac: "{{item.mac}}"
+        managementNetwork: test-site-internal_network
+        installBootRecord: false
+        provisioningInterface: eth0
+        partition: base
+      loop: "{{ nodes }}" #(1)
+
+Edge site object creation:   The last part of the playbook creates the edge site object.
+
+    - name: add test edge site
+      brightcomputing.bcm110.edge_site:
+        name: "{{site.name}}"
+        secret: "{{site.secret}}"
+        address: Springfield
+        adminEmail: admin-west@email.com
+        city: San Francisco
+        contact: Admin
+        country: USA
+        notes: Note about the site
+        state: present
+        nodes: "{{site_nodes}}"    #(1)
+764                                                                           Day-to-day Administration
+
+    The site_nodes variable, defined by the set_fact task, is assigned to the nodes attribute of an edge_site
+action.
+    Running this playbook on a fresh cluster should be enough to create a new edge site with the declared
+properties, even if the nodes are not physically present.
+    The state of the edge site can be checked with cmsh queries. It should be noted that the image creation
+step may take a few minutes, depending on how big default-image is.

@@ -1,0 +1,2264 @@
+
+                                                                                       A
+                                                       Generated Files
+This appendix contains lists of system configuration files that are managed by CMDaemon, and system
+configuration files that are managed by node-installer. These are files created or modified on the head
+nodes (section A.1), and on the regular nodes (sections A.2.3 and A.2.3). These files should not be
+confused with configuration files that are merely installed (section A.3).
+    Section 2.6.5 describes how system configuration files on all nodes are written out using the Cluster
+Management Daemon (CMDaemon). CMDaemon is introduced in section 2.6.5 and its configuration
+directives are listed in Appendix C.
+    All of these configuration files may be listed as Frozen Files in the CMDaemon configuration file
+to prevent them from being modified further by CMDaemon. The files can be frozen for the head node
+by setting the directive at /cm/local/apps/cmd/etc/cmd.conf. They can also be frozen on the regular
+nodes by setting the directive in the software image, by default at /cm/images/default-image/cm/
+local/apps/cmd/etc/cmd.conf.
+    A list of CMDeamon- and node-installer-managed files for nodes can be seen by running the com-
+mand filewriteinfo in device mode. The command has options to run it for node groupings, as well
+useful path and sort options.
+
+
+A.1    System Configuration Files Created Or Modified By CMDeamon On Head
+       Nodes
+If the filewriteinfo command is run for the head node, then it displays the files that have been written
+by CMDaemon on the head node. Running the filewriteinfo command for the head node might
+display the following on a fresh installation:
+
+[basecm11->device]% filewriteinfo basecm11
+Hostname Path                                                                       Timestamp     Actor Frozen
+-------- ------------------------------------------------------------------         ----------    ----- ------
+basecm11 /cm/images/default-image/etc/mkinitrd_cm.conf                              Mon Oct...    cmd no
+basecm11 /cm/images/default-image/etc/modprobe.d/bright-cmdaemon.conf               Mon Oct...    cmd   no
+basecm11 /cm/images/default-image/etc/securetty                                     Mon Oct...    cmd   no
+basecm11 /etc/chrony.conf                                                           Mon Oct...    cmd no
+basecm11 /etc/dhcp/dhclient.conf                                                    Mon Oct...    cmd   no
+basecm11 /etc/dhcpd.conf                                                            Mon Oct...    cmd no
+basecm11 /etc/exports                                                               Mon Oct...    cmd   no
+basecm11 /etc/genders                                                               Mon Oct...    cmd   no
+basecm11 /etc/named.conf                                                            Mon Oct...    cmd no
+basecm11 /etc/postfix/canonical                                                     Mon Oct...    cmd   no
+basecm11 /etc/postfix/generic                                                       Mon Oct...    cmd   no
+basecm11 /etc/postfix/main.cf                                                       Mon Oct...    cmd   no
+basecm11 /etc/resolv.conf                                                           Mon Oct...    cmd no
+basecm11 /etc/security/pam_bright.d/cm-check-alloc.conf                             Mon Oct...    cmd no
+856                                                                                Generated Files
+
+basecm11   /etc/shorewall.staging/interfaces                                    Mon Oct...     cmd     no
+basecm11   /etc/shorewall.staging/netmap                                        Mon Oct...     cmd     no
+basecm11   /etc/shorewall.staging/policy                                        Mon Oct...     cmd     no
+basecm11   /etc/shorewall.staging/snat                                          Mon Oct...     cmd     no
+basecm11   /etc/shorewall.staging/zones                                         Mon Oct...     cmd     no
+basecm11   /etc/sysconfig/network-scripts/ifcfg-eth1                            Mon Oct...     cmd     no
+basecm11   /tftpboot/images/default-image//boot                                 Mon Oct...     cmd     no
+basecm11   /tftpboot/images/default-image/initrd                                Mon Oct...     cmd     no
+basecm11   /tftpboot/images/default-image/vmlinuz                               Mon Oct...     cmd     no
+basecm11   /tftpboot/mtu.conf                                                   Mon Oct...     cmd     no
+basecm11   /tftpboot/pxelinux.cfg/category.default                              Mon Oct...     cmd     no
+basecm11   /var/run/cmd.url                                                     Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/my.cmd.url                                            Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/my.master.cmd.url                                     Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-chrony.conf                    Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-dhcp-dhclient.conf             Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-dhcpd.conf                     Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-exports                        Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-named.conf                     Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-postfix-canonical              Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-postfix-generic                Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-postfix-main.cf                Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-resolv.conf                    Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-shorewall.staging-interfaces   Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-shorewall.staging-netmap       Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-shorewall.staging-policy       Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-shorewall.staging-snat         Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-shorewall.staging-zones        Mon Oct...     cmd     no
+basecm11   /var/spool/cmd/saved-config-files/etc-sysconfig-network-scripts-
+                                                                   ifcfg-eth1   Mon Oct... cmd         no
+basecm11   /var/spool/cmd/saved-config-files/tftpboot-mtu.conf                  Mon Oct... cmd         no
+
+    The filewriteinfo command is covered in more detail in section A.2.
+    The more important head node files that are managed by CMDaemon are listed here for a plain
+installation on the various distributions.
+
+    Some of the more important files managed automatically on the head node by CMDaemon In RHEL and
+derivatives, Ubuntu 22.04, 24.04, SLES15
+
+ File                                    Part        Comment
+ /cm/local/apps/openldap/etc/            Section     CMDaemon modifies this when edge, cloud or
+ slapd.conf                                          HA are activated
+ /cm/local/apps/<PBS>/var/cm/            Section     <PBS> can be one of openpbs pbspro
+ cm-pbs.conf
+                                                                                          . . . continues
+A.1 System Configuration Files Created Or Modified By CMDeamon On Head Nodes                     857
+
+                                         ...continued
+ File                                Part          Comment
+ /cm/local/modulefiles/<module>      Entire di-    <module> is a file or directory for a modules en-
+                                     rectory       vironment module (section 2.2.4). For example,
+                                                   slurm, which is automatically created and made
+                                                   available for use after the Slurm workload man-
+                                                   ager is set up with cm-wlm-setup (section 7.3).
+ /cm/node-installer/etc/             Section
+ sysconfig/clock
+ /etc/aliases                        Section
+ /etc/bind/named.conf                Entire file   Ubuntu only. For zone additions use /etc/
+                                                   bind/named.conf.include1 . For options ad-
+                                                   ditions, use /etc/bind/named.conf.global.
+                                                   options.include.
+ /etc/chrony.conf                    Section       RHEL8,9 and derivatives only
+ /etc/dhcpd.conf                     Entire file
+ /etc/dhcp/dhclient.conf             Section       Not for SLES
+ /etc/dhcpd.internalnet.conf         Entire file   For internal networks other than internalnet,
+                                                   corresponding files are generated if node boot-
+                                                   ing (table 3.1) is enabled
+ /etc/exports                        Section
+ /etc/fstab                          Section
+ /etc/genders                        Section
+ /etc/hosts                          Section
+ /etc/localtime                      Symlink
+ /etc/logrotate.d/slurm              Entire file
+ /etc/logrotate.d/slurmdbd           Entire file
+ /etc/named.conf                     Entire file   Non-Ubuntu distributions only (Ubuntu uses
+                                                   /etc/bind/named.conf). For zone additions
+                                                   use /etc/named.conf.include1 .       For op-
+                                                   tions additions, use /etc/named.conf.global.
+                                                   options.include.
+ /etc/ntp.conf                       Section       Ubuntu and SUSE only
+ /etc/postfix/canonical              Section
+ /etc/postfix/generic                Section
+ /etc/postfix/main.cf                Section
+                                                                                        . . . continues
+858                                                                                            Generated Files
+
+                                                     ...continued
+ File                                           Part          Comment
+ /etc/resolv.conf                               Section       The stub resolver can alternatively be
+                                                              provided   by    systemd-resolved  (man
+                                                              systemd-resolved.8, page 93)
+ /etc/shorewall6.staging/                       Section
+ interfaces
+ /etc/shorewall6.staging/policy                 Section
+ /etc/shorewall6.staging/rules                  Section
+ /etc/shorewall6.staging/snat                   Section
+ /etc/shorewall6.staging/zones                  Section
+ /etc/shorewall/interfaces                      Section
+ /etc/shorewall/netmap                          Section
+ /etc/shorewall/policy                          Section
+ /etc/shorewall/rules                           Section
+ /etc/shorewall/snat                            Section
+ /etc/shorewall/zones                           Section
+ /etc/snmp/snmptrapd.conf                       Section
+ /etc/sysconfig/bmccfg                          Entire file   BMC configuration and BCM configuration
+ /etc/sysconfig/clock                           Section
+ /etc/sysconfig/dhcpd                           Entire file
+ /etc/sysconfig/network-scripts/                Section
+ ifcfg-*
+ /tftpboot/mtu.conf                             Entire file   BCM configuration
+ /tftpboot/pxelinux.cfg/category.               Entire file   BCM configuration
+ default
+ /var/lib/named/*.zone1,2                       Entire file   For SLES distributions only. For custom addi-
+                                                              tions use /var/lib/named/*.zone.include
+ /var/named/*.zone1,2                           Entire file   For RHEL8, RHEL9 distributions only. For
+                                                              custom additions use /var/named/*.zone.
+                                                              include
+ 1 User-added zone files ending in *.zone that are placed for a corresponding zone statement in the
+
+ include file /etc/[bind/]named.conf.include are wiped by CMDaemon activity. Another pattern,
+ eg: *.myzone, must therefore be used instead
+ 2 For Ubuntu, the zone files are under /etc/bind/
+
+
+
+A.2     System Configuration Files Created Or Modified Directly On The Node
+Files that are created or modified by CMDaemon or the node-installer directly on the node by CMDea-
+mon can be seen with the filewriteinfo command.
+    For example, for a particular node, in this case node002 (some output elided):
+
+Example
+
+[basecm11->device]% filewriteinfo node002
+Hostname    Path                                    Timestamp                 Actor           Frozen
+----------- --------------------------------------- ------------------------- --------------- ------
+A.2 System Configuration Files Created Or Modified Directly On The Node                             859
+
+node002       /certificates/fa-16-3e-54-bb-a1/cert      Thu Jul 14 12:16:00 2022 node-installer      no
+...
+node002       /etc/chrony.conf                          Thu Jul 14 12:17:08 2022 node-installer      no
+...
+node002       /etc/exports                              Thu Jul 14 12:17:58 2022    cmd              no
+...
+   In the preceding, /etc/exports is seen to have been changed by cmd, which is listed under the Actor
+column.
+
+A.2.1 Options To filewriteinfo
+Options to filewriteinfo can be viewed with the help filewwriteinfo command.
+   Some of the options are:
+   • -n|--node: This can be used to specify a node list (page 72).
+   • --field: The --field option can be used with, for example, the mac field, as follows (some output
+     elided):
+
+     Example
+
+     [basecm11->device]% get node002 mac
+     FA:16:3E:54:BB:A1
+     [basecm11->device]% filewriteinfo --field mac=FA:16:3E:54:BB:A1
+     Hostname    Path                                    Timestamp                 Actor           Frozen
+     ----------- --------------------------------------- ------------------------- --------------- ------
+     node002     /certificates/fa-16-3e-54-bb-a1/cert    Thu Jul 14 12:16:00 2022 node-installer no
+     ...
+     node002     /etc/chrony.conf                        Thu Jul 14 12:17:08 2022 node-installer no
+     ...
+     node002     /etc/exports                            Thu Jul 14 12:17:58 2022 cmd              no
+     ...
+
+     The preceding example has the same output as for the session with filewriteinfo node002 on
+     page 858.
+
+          – A pitfall to avoid is the following: The columns headers of the output of the filewriteinfo
+            command, such as Actor, are not keys for the --field option.
+            Example
+            [basecm11->device]% filewriteinfo node002 --field Actor=cmd             #this is incorrect
+            Instead, as is the norm for a device mode command, it is the fields of the mode that are the
+            key=value pairs (for keys that are valid for the device concerned). The fields of the device
+            mode are displayed when the format command (page 60) is run.
+
+   • --sort: This sorts the filewriteinfo output according to column headers (Actor, Timestamp and
+     so on).
+   • --path: This can be used to specify a file.
+
+     Example
+
+     [basecm11->device]% filewriteinfo --path /etc/chrony.conf --sort actor
+     Hostname         Path              Timestamp                 Actor           Frozen
+     ---------------- ----------------- ------------------------- --------------- ------------
+     basecm11         /etc/chrony.conf Thu Jul 14 12:14:25 2022 cmd               no
+     node001          /etc/chrony.conf Thu Jul 14 12:17:08 2022 node-installer no
+     node002          /etc/chrony.conf Thu Jul 14 12:17:08 2022 node-installer no
+860                                                                              Generated Files
+
+A.2.2 Files Created On Regular Nodes By CMDaemon
+Files on a regular node that are modified by CMDaemon can be seen in the output of filewriteinfo.
+The filewriteinfo command displays a list of the last files written by the cluster manager.
+    For a default installation, the list is as shown in the following table:
+A.2 System Configuration Files Created Or Modified Directly On The Node                             861
+
+   System configuration files created or modified on a default regular nodes image by CMDaemon
+
+ File                                                             Part          Comment
+ /etc/aliases                                                     Section
+ /etc/fstab                                                       Section       SLES only
+ /etc/hosts                                                       Section
+ /etc/nslcd.conf                                                  Section       RHEL8 and derivatives, and
+                                                                                Ubuntu only
+ /etc/pam.d/sshd                                                  Section
+ /etc/postfix/main.cf                                             Section
+ /etc/rsyslog.conf                                                Section       RHEL9 and derivatives, and
+                                                                                SLES only
+ /etc/security/pam_bright.d/cm-check-alloc.conf                   Entire file
+ /var/run/cmd.url                                                 Entire file
+ /var/spool/cmd/my.cmd.url                                        Entire file
+ /var/spool/cmd/my.master.cmd.url                                 Entire file
+ /var/spool/cmd/saved-config-files/etc-aliases                    Entire file
+                                                                  Section
+ /var/spool/cmd/saved-config-files/etc-fstab                      Entire file   SLES Only
+ /var/spool/cmd/saved-config-files/etc-hosts                      Entire file
+ /var/spool/cmd/saved-config-files/etc-nslcd.conf                 Entire file   RHEL8 and derivatives, and
+                                                                                Ubuntu only
+ /var/spool/cmd/saved-config-files/etc-pam.d-sshd      Entire file
+ /var/spool/cmd/saved-config-files/etc-postfix-main.cf Entire file
+ /var/spool/cmd/saved-config-files/etc-rsyslog.conf    Entire file              RHEL9 and derivatives, and
+                                                                                SUSE only
+
+
+
+A.2.3 Files Created On Regular Nodes By The Node-Installer
+The list of files on a regular node that are modified by the node-installer during the last installation
+session can be viewed in the logs at /var/log/modified-by-node-installer.log on the node, and in
+the output of filewriteinfo. For a default installation, these are as shown in the following table:
+862                                                                                         Generated Files
+
+    System configuration files created or modified on regular nodes by the node-installer in RHEL8, RHEL9 and
+derivatives
+
+ File                                                    Part          Comment
+ /etc/sysconfig/network-scripts/ifcfg-*                  Entire        Interfaces for RHEL8, RHEL9 and derivatives only
+ /etc/network/interfaces.d/ifcfg-*                       Entire file   Ubuntu only
+ /etc/sysconfig/network/ifcfg-*                          Entire file   SUSE only,
+ /etc/sysconfig/network                                  Section       Only for RHEL8, RHEL9 and derivatives
+ /etc/sysconfig/network/config                           Section       Only for SLES
+ /etc/sysconfig/network/routes                           Section       Only for SLES
+ /etc/resolv.conf                                        Entire file   Only for RHEL8, RHEL9 and derivatives
+ /etc/hosts                                              Section
+ /etc/fstab                                              Section       Not for SLES. In SLES it is managed by CMDaemon
+ /etc/postfix/main.cf                                    Section
+ /etc/chrony.conf                                        Entire file   RHEL8,RHEL9 and derivatives only
+ /etc/ntp.conf                                           Entire file   SUSE and Ubuntu only
+ /etc/systemd/resolved.conf                              Entire file   Ubuntu only
+ /etc/hostname                                           Section
+ /cm/local/apps/cmd/etc/cert.key                         Section
+ /cm/local/apps/cmd/etc/cert.pem                         Section
+ /cm/local/apps/cmd/etc/cluster.pem                      Section
+ /cm/local/apps/openldap/etc/certs/ldap.key              Section
+ /cm/local/apps/openldap/etc/certs/ldap.pem              Section
+ /var/log/modified-by-node-installer.log                 Section
+ /var/log/node-installer                                 Section
+ /var/log/rsyncd.log                                     Section
+ /var/spool/cmd/disks.xml                                Section
+
+
+
+A.3     Files Not Generated, But Installed In RHEL And Derivatives
+This appendix (Appendix A) is mainly about generated configuration files. This section (A.3) of the
+appendix discusses a class of files that is not generated, but may still be confused with generated files.
+The discussion in this section clarifies the issue, and explains how to check if non-generated installed
+files differ from the standard distribution installation.
+    A design goal of BCM is that of minimal interference. That is, to stay out of the way of the distribu-
+tions that it works with as much as is reasonable. Still, there are inevitably cluster manager configuration
+files that are not generated, but installed from a cluster manager package. A cluster manager configura-
+tion file of this kind overwrites the distribution configuration file with its own special settings to get the
+cluster running, and the file is then not maintained by the node-installer or CMDaemon. Such files are
+therefore not listed on any of the tables in this chapter.
+    Sometimes the cluster file version may differ unexpectedly from the distribution version. To look
+into this, the following steps may be followed:
+
+Is the configuration file a BCM version or a distribution version? A convenient way to check if a
+particular file is a cluster file version is to grep for it in the packages list for the cluster packages. For
+example, for nsswitch.conf:
+A.3 Files Not Generated, But Installed In RHEL And Derivatives                                         863
+
+[root@basecm11 ~]# repoquery -l $(repoquery -a | grep -F _cmHEAD) | grep nsswitch.conf$
+
+    The inner repoquery displays a list of all the packages. By grepping for the cluster manager version
+string, for example _cmHEAD for NVIDIA Base Command Manager 11, the list of cluster manager pack-
+ages is found. The outer repoquery displays the list of files within each package in the list of cluster
+manager packages. By grepping for nsswitch.conf$, any file paths ending in nsswitch.conf in the
+cluster manager packages are displayed. The output is:
+
+/cm/conf/etc/nsswitch.conf
+
+    Files under /cm/conf are placed by BCM packages when updating the head node. From there they
+are copied over during the post-install section of the RPM to where the distribution version configura-
+tion files are located by the cluster manager, but only during the initial installation of the cluster. The
+distribution version file is overwritten in this way to prevent RPM dependency conflicts of the BCM
+version with the distribution version. The configuration files are not copied over from /cm/conf dur-
+ing subsequent reboots after the initial installation. The cm/conf files are however updated when BCM
+packages are updated. During such a BCM update, a notification is displayed that new configuration
+files are available.
+    Inverting the cluster manager version string match displays the files not provided by BCM. These
+are normally the files provided by the distribution:
+
+[root@basecm11 ~]# repoquery -l $(repoquery -a | grep -F -v _cmHEAD) | grep nsswitch.conf$
+...
+/usr/share/factory/etc/nsswitch.conf
+/usr/share/factory/etc/nsswitch.conf
+/etc/authselect/nsswitch.conf
+/etc/authselect/user-nsswitch.conf
+/usr/share/authselect/default/minimal/nsswitch.conf
+/usr/share/authselect/default/sssd/nsswitch.conf
+/usr/share/authselect/default/winbind/nsswitch.conf
+/var/lib/authselect/nsswitch.conf
+/etc/authselect/nsswitch.conf
+/etc/authselect/user-nsswitch.conf
+/usr/share/authselect/default/minimal/nsswitch.conf
+/usr/share/authselect/default/sssd/nsswitch.conf
+/usr/share/authselect/default/winbind/nsswitch.conf
+/var/lib/authselect/nsswitch.conf
+/etc/nsswitch.conf
+/etc/nsswitch.conf
+/usr/share/authselect/vendor/libnss-mysql/nsswitch.conf
+/usr/share/rear/skel/default/etc/nsswitch.conf
+
+Which package provides the file in BCM and in the distribution? The packages that provide these
+files can be found by running the “yum whatprovides *” command on the paths given by the preceding
+output, for example:
+
+~# yum whatprovides */cm/conf/etc/nsswitch.conf
+...
+cm-config-ldap-client<various types and versions are seen>
+
+     This reveals that some BCM LDAP packages can provide an nsswitch.conf file. The file is a plain
+file provided by the unpacking and placement that takes place when the package is installed. The file is
+not generated or maintained periodically after placement, which is the reason why this file is not seen
+in the tables of sections A.1 and A.2.3 of this appendix.
+     Similarly, looking through the output for the less specific case:
+864                                                                                      Generated Files
+
+~# yum whatprovides */etc/nsswitch.conf
+...
+cm-config-ldap-client*
+glibc*
+rear*
+systemd*
+
+shows that glibc provides a distribution version of the nsswitch.conf file, that the rear package from
+the distribution provides a version of it, and that there is also a systemd version of this file available
+from the distribution packages. The glob * in the output in this manual represents a variety of types and
+versions. The actual display that is seen on the screen is an expansion of the glob.
+
+Similar Ubuntu queries: For Ubuntu, a query of the form dpkg -S <filename> shows the packages
+that provide a file with the pattern <filename>.
+
+Example
+
+root@head:~# dpkg -S "nsswitch.conf"
+cm-config-ldap-client-master: /cm/conf/etc/nsswitch.conf
+manpages: /usr/share/man/man5/nsswitch.conf.5.gz
+libc-bin: /usr/share/libc-bin/nsswitch.conf
+
+   To work out which Ubuntu package is a distribution package and which is a BCM package, queries
+similar to the following can be run:
+
+Example
+
+root@head:~# dpkg-query -W -f='${binary:Package} ${Version}\n' $(dpkg -S "nsswitch.conf" | cut -f1 -d:) |\
+ grep cm10.0
+cm-config-ldap-client-master 10.0-155-cm10.0
+root@head:~# dpkg-query -W -f='${binary:Package} ${Version}\n' $(dpkg -S "nsswitch.conf" | cut -f1 -d:) |\
+ grep -v cm10.0
+libc-bin 2.35-0ubuntu3.8
+manpages 5.10-1ubuntu1
+
+What are the differences between the BCM version and the distribution versions of the file? Some-
+times it is helpful to compare a distribution version and cluster version of nsswitch.conf to show the
+differences in configuration. The versions of the RPM packages containing the nsswitch.conf can be
+downloaded, their contents extracted, and their differences compared as follows:
+
+~# mkdir yumextracted ; cd yumextracted
+~# yumdownloader glibc-2.34
+~# rpm2cpio glibc-2.34-100.el9_4.4.x86_64.rpm | cpio -idmv
+~# yumdownloader cm-config-ldap-client-master
+~# rpm2cpio cm-config-ldap-client-master-HEAD-155_cmHEAD.noarch.rpm | cpio -idmv
+~# diff etc/nsswitch.conf cm/conf/etc/nsswitch.conf
+...
+
+What are the configuration files in an RPM package? An RPM package allows files within it to be
+marked as configuration files. Files marked as configuration files can be listed with rpm -qc <package>.
+Optionally, piping the list through “sort -u” filters out duplicates.
+
+Example
+A.3 Files Not Generated, But Installed In RHEL And Derivatives                                                         865
+
+~# rpm -qc glibc | sort -u
+/etc/gai.conf
+/etc/ld.so.cache
+/etc/ld.so.conf
+/etc/nsswitch.conf
+/etc/rpc
+/usr/lib64/gconv/gconv-modules
+/usr/lib/gconv/gconv-modules
+/var/cache/ldconfig/aux-cache
+
+How does an RPM installation deal with local configuration changes? Are there configuration files
+or critical files that BCM misses? Whenever an RPM installation detects a file with local changes, it
+can treat the local system file as if:
+   1. the local system file is frozen1 . The installation does not interfere with the local file, but places the
+      updated file as an .rpmnew file in the same directory.
+   2. the local system file is not frozen. The installation changes the local file. It copies the local file to
+      an .rpmsave file in the same directory, and installs a new file from the RPM package.
+    When building BCM packages, the package builders can specify which of these two methods apply.
+When dealing with the built package, the system administrator can use an rpm query method to deter-
+mine which of the two methods applies for a particular file in the package. For example, for glibc, the
+following query can be used and grepped:
+rpm -q --queryformat '[%{FILENAMES}\t%{FILEFLAGS:fflags}\n]' glibc | egrep '[[:space:]].*(c|n).*$' | sort -u
+/etc/gai.conf cmng
+/etc/ld.so.cache        cmng
+/etc/ld.so.conf cn
+/etc/nsswitch.conf      cn
+/etc/rpc        cn
+/usr/lib64/gconv/gconv-modules cn
+/usr/lib/gconv/gconv-modules    cn
+/var/cache/ldconfig/aux-cache   cmng
+
+   Here, the second column of the output displayed shows which of the files in the package have a
+configuration (c) flag or a noreplace (n) flag. The c flag without the n flag indicates that an .rpmsave file
+will be created, while a c flag together with an n flag indicates that an .rpmnew file will be created.
+   In any case, files that are not marked as configuration files are overwritten during installation.
+   So:
+   • If a file is not marked as a configuration file, and it has been customized by the system administra-
+     tor, and this file is provided by an RPM package, and the RPM package is updated on the system,
+     then the file is overwritten silently.
+   • If a file is marked as a configuration file, and it has been customized by the system administrator,
+     and this file is provided by an RPM package, and the RPM package is updated on the system, then
+     it is good practice to look for .rpmsave and .rpmnew versions of that file, and run a comparison
+     on detection.
+   BCM should however mark all critical files as configuration files in BCM packages.
+   Sometimes, RPM updates can overwrite a particular file that the administrator has changed locally
+and then would like to keep frozen.
+   To confirm that this is the problem, the following should be checked:
+  1 This package manager freezing should not be confused with CMDaemon freezing. With CMDaemon freezing, which is done
+
+with the FrozenFile directive (Appendix C), a file or section of a file that would normally be maintained by CMDaemon before
+freezing it, is no longer maintained by CMDaemon after freezing it.
+866                                                                                        Generated Files
+
+   • The --queryformat option should be used to check that file can indeed be overwritten by updates.
+     If the file has an n flag (regardless of whether it is a configuration file or not) then overwriting due
+     to RPM updates does not happen, and the local file remains frozen. If the file has no n flag, then
+     replacement occurs during RPM updates.
+
+For files with no n flag, but where the administrator would still like to freeze the file during updates, the
+following can be considered:
+
+   • The file text content should be checked to see if it is a CMDaemon-maintained file (section 2.6.5),
+     or checked against the list of generated files (Appendix A). This is just to make sure to avoid
+     confusion about how changes are occurring in such a file.
+
+        – If it is a CMDaemon-maintained file, then configuration changes put in by the administra-
+          tor will also not persist in the maintained section of the file unless the FrozenFile directive
+          (section C) is used to freeze the change.
+        – If it is only a section that CMDaemon maintains, then configuration changes can be placed
+          outside of the maintained section.
+
+      Wherever the changes are placed in such a file, these changes are in any case by default overwritten
+      on RPM updates if the file has no n flag.
+
+   • Some regular node updates can effectively be maintained in a desired state with the help of a
+     finalize script (Appendix E).
+
+   • Updates can be excluded from YUM/zypper (section 9.3.2), thereby avoiding the overwriting of
+     that file by the excluded package.
+
+A request to change the package build flag may be sent to the BCM support team if the preceding
+suggested options are unworkable.
+                                                                   B
+         Bright Computing Public Key
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG v1.4.0 (GNU/Linux)
+
+mQGiBEqtYegRBADStdQjn1XxbYorXbFGncF2IcMFiNA7hamARt4w7hjtwZoKGHbC
+zSLsQTmgZO+FZs+tXcZa50LjGwhpxT6qhCe8Y7zIh2vwKrKlaAVKj2PUU28vKj1p
+2W/OIiG/HKLtahLiCk0L3ahP0evJHh8B7elClrZOTKTBB6qIUbC5vHtjiwCgydm3
+THLJsKnwk4qZetluTupldOEEANCzJ1nZxZzN6ZAMkIBrct8GivWClT1nBG4UwjHd
+EDcGlREJxpg/OhpEP8TY1e0YUKRWvMqSVChPzkLUTIsd/O4RGTw0PGCo6Q3TLXpM
+RVoonYPR1tRymPNZyW8VJeTUEn0kdlCaqZykp1sRb3jFAiJIRCmBRc854i/jRXmo
+foTPBACJQyoEH9Qfe3VcqR6+vR2tX9lPvkxS7A5AnJIRs3Sv6yM4oV+7k/HrfYKt
+fyl6widtEbQ1870s4x3NYXmmne7lz1nGxBfAxzPG9rtjRSXyVxc+KGVd6gKeCV6d
+o7kS/LJHRi0Lb5G4NZRFy5CGqg64liJwp/f2J4uyRbC8b+/LQbQ7QnJpZ2h0IENv
+bXB1dGluZyBEZXZlbG9wbWVudCBUZWFtIDxkZXZAYnJpZ2h0Y29tcHV0aW5nLmNv
+bT6IXgQTEQIAHgUCSq1h6AIbAwYLCQgHAwIDFQIDAxYCAQIeAQIXgAAKCRDvaS9m
++k3m0JO0AKC0GLTZiqoCQ6TRWW2ijjITEQ8CXACgg3o4oVbrG67VFzHUntcA0YTE
+DXW5Ag0ESq1h6xAIAMJiaZI/0EqnrhSfiMsMT3sxz3mZkrQQL82Fob7s+S7nnMl8
+A8btPzLlK8NzZytCglrIwPCYG6vfza/nkvyKEPh/f2it941bh7qiu4rBLqr+kGx3
+zepSMRqIzW5FpIrUgDZOL9J+tWSSUtPW0YQ5jBBJrgJ8LQy9dK2RhAOLuHfbOSVB
+JLIwNKxafkhMRwDoUNS4BiZKWyPFu47vd8fM67IPT1nMl0iCOR/QBn29MYuWnBcw
+61344pd/IjOu3gM6YBqmRRU6yBeVi0TxxbYYnWcts6tEGAlTjHUOQ7gxVp4RDia2
+jLVtbee8H464wxkkC3SSkng216RaBBAoaAykhzcAAwUH/iG4WsJHFw3+CRhUqy51
+jnmb1FTFO8KQXI8JlPXM0h6vv0PtP5rw5D5V2cyVe2i4ez9Y8XMVfcbf60lptKyY
+bRUjQq+9SNjt12ESU67YyLstSN68ach9Af03PoSZIKkiNwfA0+VBILv2Mhn7xd74
+5L0M/eJ7lHSpeJA2Rzs6szc234Ob/VxGfGWjogaK3NElSYOzQo+/k0VMdMWsQm/8
+Ras19IA9P5jlSbcZQlHlPjndS4x4XQ8P41ATczsIDyWhsJC51rTuw9/QO7fqvvPn
+xsRz1pFmiiN7I4JLjw0nAlXexn4EaeVa7Eb+uTjvxJZNdShs7Td74OmlF7RKFccI
+wLuISQQYEQIACQUCSq1h6wIbDAAKCRDvaS9m+k3m0C/oAJsHMmKrLPhjCdZyHbB1
+e19+5JABUwCfU0PoawBN0HzDnfr3MLaTgCwjsEE=
+=WJX7
+-----END PGP PUBLIC KEY BLOCK-----
+                                                                                       C
+      CMDaemon Configuration File
+                      Directives
+This appendix lists all configuration file directives that may be used in the cluster management daemon
+configuration file. If a change is needed, then the directives are normally changed on the head node, or
+on both head nodes in the high availability configuration, in:
+/cm/local/apps/cmd/etc/cmd.conf
+
+    The directives can also be set in some cases for the regular nodes, via the software image in /cm/
+images/default-image/cm/local/apps/cmd/etc/cmd.conf on the head node. Changing the defaults
+already there is however not usually needed, and is not recommended.
+    Only one directive is valid per cmd.conf file.
+    To activate changes in a cmd.conf configuration file, the cmd service associated with it must be
+restarted.
+
+   • For the head node this is normally done with the command:
+
+     systemctl restart cmd
+
+   • For regular nodes, cmd running on the nodes is restarted. Often, the image should be updated
+     before cmd is restarted. How to carry out these procedures for a directive is described with an
+     example where the FrozenFile directive is activated on a regular node on page 883.
+
+
+Master directive
+Syntax: Master = hostname
+Default: Master = master
+
+The cluster management daemon treats the host specified in the Master directive as the head node. A
+cluster management daemon running on a node specified as the head node starts in head mode. On a
+regular node, it starts in node mode.
+
+
+Port directive
+Syntax: Port = number
+Default: Port = 8080
+
+The number used in the syntax above is a number between 0 and 65535. The default value is 8080.
+   The Port directive sets the value of the port of the cluster management daemon to listen for non-
+SSL HTTP calls. By default, this happens only during init. All other communication with the cluster
+870                                                        CMDaemon Configuration File Directives
+
+management daemon is carried out over the SSL port. Pre-init port adjustment can be carried out in
+the node-installer.conf configuration. Shorewall may need to be modified to allow traffic through for a
+changed port.
+
+
+SSLPort directive
+Syntax: SSLPort = number
+Default: SSLPort = 8081
+
+The number used in the syntax above is a number between 0 and 65535. The default value is 8081.
+    The SSLPort directive sets the value of the SSL port of the cluster management daemon to listen for
+SSL HTTP calls. By default, it is used for all communication of CMDaemon with Base View and cmsh,
+except for when CMDaemon is started up from init.
+    This directive does not change the firewall port settings to match the value of the SSL port for CM-
+Daemon communication. The firewall port settings value does however change if using the cm-cmd-ports
+utility (page 73 of the Installation Manual) instead.
+
+SSLPortOnly directive
+Syntax: SSLPortOnly = yes|no
+Default: SSLPortOnly = no
+
+The SSLPortOnly directive allows the non-SSL port to be disabled. By default, during normal running,
+both SSL and non-SSL ports are listening, but only the SSL port is used. Also by default, the non-SSL
+port is only used during CMDaemon start up.
+   If bootloaderprotocol (section 5.1.6) is set to HTTP, then SSLPortOnly must be set to no. The HTTPS
+protocol is unsupported by most bootloaders.
+
+
+CertificateFile directive
+Syntax: CertificateFile = filename
+Default: CertificateFile = "/cm/local/apps/cmd/etc/cert.pem"
+
+The CertificateFile directive specifies the PEM-format certificate which is to be used for authentica-
+tion purposes. On the head node, the certificate used also serves as a software license.
+
+
+PrivateKeyFile directive
+Syntax: PrivateKeyFile = filename
+Default: PrivateKeyFile = "/cm/local/apps/cmd/etc/cert.key"
+
+The PrivateKeyFile directive specifies the PEM-format private key which corresponds to the certificate
+that is being used.
+
+
+CACertificateFile directive
+Syntax: CACertificateFile = filename
+Default: CACertificateFile = "/cm/local/apps/cmd/etc/cacert.pem"
+
+The CACertificateFile directive specifies the path to the BCM PEM-format root certificate. It is nor-
+mally not necessary to change the root certificate.
+                                                                                                  871
+
+ClusterCertificateFile directive
+Syntax: ClusterCertificateFile = filename
+Default: ClusterCertificateFile = "/cm/local/apps/cmd/etc/cluster.pem"
+
+The ClusterCertificateFile directive specifies the path to the BCM PEM-format cluster certificate file
+used as a software license, and to sign all client certificates
+
+
+ClusterPrivateKeyFile directive
+Syntax: ClusterPrivateKeyFile = filename
+Default: ClusterPrivateKeyFile = "/cm/local/apps/cmd/etc/cluster.key"
+
+The ClusterPrivateKeyFile directive specifies the path to the BCM PEM-format private key which
+corresponds to the cluster certificate file.
+
+
+RandomSeedFile directive
+Syntax: RandomSeedFile = filename
+Default: RandomSeedFile = "/dev/urandom"
+
+The RandomSeedFile directive specifies the path to a source of randomness for a random seed.
+
+
+RandomSeedFileSize directive
+Syntax: RandomSeedFileSize = number
+Default: RandomSeedFileSize = 8192
+
+The RandomSeedFileSize directive specifies the size of the random seed.
+
+
+DHParamFile directive
+Syntax: DHParamFile = filename
+Default: DHParamFile = "/cm/local/apps/cmd/etc/dh1024.pem"
+
+The DHParamFile directive specifies the path to the Diffie-Hellman parameters.
+
+
+SSLHandshakeTimeout directive
+Syntax: SSLHandshakeTimeout = number
+Default: SSLHandshakeTimeout = 10
+
+The SSLHandShakeTimeout directive controls the time-out period (in seconds) for SSL handshakes.
+
+
+SSLSessionCacheExpirationTime directive
+Syntax: SSLSessionCacheExpirationTime = number
+Default: SSLSessionCacheExpirationTime = 300
+
+The SSLSessionCacheExpirationTime directive controls the period (in seconds) for which SSL sessions
+are cached. Specifying the value 0 can be used to disable SSL session caching.
+872                                                       CMDaemon Configuration File Directives
+
+DBHost directive
+Syntax: DBHost = hostname
+Default: DBHost = "localhost"
+
+The DBHost directive specifies the hostname of the MySQL database server.
+
+
+DBPort directive
+Syntax: DBPort = number
+Default: DBHost = 3306
+
+The DBPort directive specifies the TCP port of the MySQL database server.
+
+
+DBUser directive
+Syntax: DBUser = username
+Default: DBUser = cmdaemon
+
+The DBUser directive specifies the username used to connect to the MySQL database server.
+
+
+DBPass directive
+Syntax: DBPass = password
+Default: DBPass = "<random string set during installation>"
+
+The DBPass directive specifies the password used to connect to the MySQL database server.
+
+
+DBName directive
+Syntax: DBName = database
+Default: DBName = "cmdaemon"
+
+The DBName directive specifies the database used on the MySQL database server to store CMDaemon
+related configuration and status information.
+
+
+DBUnixSocket directive
+Syntax: DBUnixSocket = filename
+Default: DBUnixSocket = "/var/lib/mysql/mysql.sock"
+
+The DBUnixSocket directive specifies the named pipe used to connect to the MySQL database server if
+it is running on the same machine.
+
+
+DBUpdateFile directive
+Syntax: DBUpdateFile = filename
+Default: DBUpdateFile = "/cm/local/apps/cmd/etc/cmdaemon_upgrade.sql"
+
+The DBUpdateFile directive specifies the path to the file that contains information on how to upgrade
+the database from one revision to another.
+                                                                                                      873
+
+EventBucket directive
+Syntax: EventBucket = filename
+Default: EventBucket = "/var/spool/cmd/eventbucket"
+
+The EventBucket directive (section 10.10.3) specifies the path to the named pipe that is created to listen
+for incoming events from a user.
+
+
+EventBucketFilter directive
+Syntax: EventBucketFilter = filename
+Default: EventBucketFilter = "/cm/local/apps/cmd/etc/eventbucket.filter"
+
+The EventBucketFilter directive (section 10.10.3) specifies the path to the file that contains regular
+expressions used to filter out incoming messages on the event-bucket.
+
+
+LDAPHost directive
+Syntax: LDAPHost = hostname
+Default: LDAPHost = "localhost"
+
+The LDAPHost directive specifies the hostname of the LDAP server to connect to for user management.
+
+
+LDAPUser directive
+Syntax: LDAPUser = username
+Default: LDAPUser = "root"
+
+The LDAPUser directive specifies the username used when connecting to the LDAP server.
+
+
+LDAPPass directive
+Syntax: LDAPPass = password
+Default: LDAPPass = "<random string set during installation>"
+
+The LDAPPass directive specifies the password used when connecting to the LDAP server. It can be
+changed following the procedure described in Appendix I.
+
+
+LDAPReadOnlyUser directive
+Syntax: LDAPReadOnlyUser = username
+Default: LDAPReadOnlyUser = "readonlyroot"
+
+The LDAPReadOnlyUser directive specifies the username that will be used when connecting to the LDAP
+server during LDAP replication. The user is a member of the "rogroup" group, whose members have a
+read-only access to the whole LDAP directory.
+
+
+LDAPReadOnlyPass directive
+Syntax: LDAPReadOnlyPass = password
+Default: LDAPReadOnlyPass = "<random string set during installation>"
+
+The LDAPReadOnlyPass directive specifies the password that will be used when connecting to the LDAP
+server during LDAP replication.
+874                                                       CMDaemon Configuration File Directives
+
+LDAPSearchDN directive
+Syntax: LDAPSearchDN = dn
+Default: LDAPSearchDN = "dc=cm,dc=cluster"
+
+The LDAPSearchDN directive specifies the Distinguished Name (DN) used when querying the LDAP
+server.
+
+
+LDAPProtocol directive
+Syntax: LDAPProtocol = ldap|ldaps
+Default: LDAPProtocol = "ldaps"
+
+The LDAPProtocol directive specifies the LDAP protocol to be used when querying the LDAP server.
+
+
+LDAPPort directive
+Syntax: LDAPPort = number
+Default: LDAPPort = 636
+
+The LDAPPort directive specifies the port to be used when querying the LDAP server.
+
+
+LDAPCACertificate directive
+Syntax: LDAPCACertificate = filename
+Default: LDAPCACertificate = "/cm/local/apps/openldap/etc/certs/ca.pem"
+
+The LDAPCACertificate directive specifies the CA certificate to be used when querying the LDAP
+server.
+
+
+LDAPCertificate directive
+Syntax: LDAPCertificate = filename
+Default: LDAPCertificate = "/cm/local/apps/openldap/etc/certs/ldap.pem"
+
+The LDAPCertificate directive specifies the LDAP certificate to be used when querying the LDAP
+server.
+
+
+LDAPPrivateKey directive
+Syntax: LDAPPrivateKey= filename
+Default: LDAPPrivateKey= "/cm/local/apps/openldap/etc/certs/ldap.key"
+
+The LDAPPrivateKey directive specifies the LDAP key to be used when querying the LDAP server.
+
+
+HomeRoot directive
+Syntax: HomeRoot = path
+Default: HomeRoot = "/home"
+
+The HomeRoot directive specifies the default user home directory used by CMDaemon. It is used for
+automatic mounts, exports, and when creating new users.
+                                                                                                  875
+
+DocumentRoot directive
+Syntax: DocumentRoot = path
+Default: DocumentRoot = "/cm/local/apps/cmd/etc/htdocs"
+
+The DocumentRoot directive specifies the directory mapped to the web-root of the CMDaemon. The
+CMDaemon acts as a HTTP-server, and can therefore in principle also be accessed by web-browsers.
+
+
+SpoolDir directive
+Syntax: SpoolDir = path
+Default: SpoolDir = "/var/spool/cmd"
+
+The SpoolDir directive specifies the directory which is used by the CMDaemon to store temporary and
+semi-temporary files.
+
+
+EnableShellService directive
+Syntax: EnableShellService = true|false
+Default: EnableShellService = true
+
+The EnableShellService directive allows shells to be started from Base View.
+   The connection runs over CMDaemon, which is running over SSL, which means that between Base
+View and the device, the connection is encrypted.
+   The directive does not affect cmsh’s rshell, rconsole telnet, and ssh commands.
+
+
+DisableRemoteShell directive
+Syntax: AdvancedConfig = {"DisableRemoteShell=0|1", ...}
+Default: DisableRemoteShell=0
+DisableRemoteShell is a parameter of the AdvancedConfig (page 888) directive.
+    By default CMDaemon provides access to devices via rshell, rconsole (SOL), telnet, and ssh.
+Setting the directive to 1 disables all RPC shell access.
+    A more fine-grained disabling is possible with the following AdvancedConfig directives, which fol-
+low the same syntax:
+
+   • DisableRemoteRShell directive: disables a remote shell to the head node.
+
+   • DisableRemoteRShellImage directive: disables a remote shell to the chrooted software image.
+
+   • DisableRemoteRShellNode directive: disables a remote shell to the regular nodes.
+
+   • DisableRemoteRShellTelnet directive: disables a telnet shell to a device.
+
+   • DisableRemoteRShellSSH directive: disables SSH to a device.
+
+   • DisableRemoteSOL directive: disables a console via SOL to a device.
+
+
+EnableWebSocketService directive
+Syntax: EnableWebSocketService = true|false
+Default: EnableWebSocketService = true
+
+The EnableWebSocketService directive allows the use of CMDaemon Lite (section 2.6.7).
+876                                                        CMDaemon Configuration File Directives
+
+EnablePrometheusMetricService directive
+Syntax: EnablePrometheusMetricService = true|false
+Default: EnablePrometheusMetricService = true
+
+If true, the EnablePrometheusMetricService directive creates an HTTP endpoint for Prometheus-style
+exporters that do not have their own HTTP endpoint.
+
+
+PrometheusMetricServicePath directive
+Syntax: PrometheusMetricServicePath = path
+Default: PrometheusMetricServicePath = SCRIPTS_DIR"metrics/prometheus"
+
+The PrometheusMetricServicePath directive is the path from which CMDaemon can serve Prometheus
+metrics. SCRIPTS_DIR is the stem path /cm/local/apps/cmd/scripts by default.
+
+
+EnablePrometheusExporterService directive
+Syntax: EnablePrometheusExporterService = true|false
+Default: EnablePrometheusExporterService = false
+
+If true, the EnablePrometheusExporterService directive allows a Prometheus server to pull data from
+CMDaemon.
+     To collect all data, the external Prometheus YAML configuration (https://prometheus.io/docs/
+prometheus/latest/configuration/configuration/) should have all nodes with a monitoring role
+added to it:
+
+Example
+
+#
+# - job_name: cmdaemon-head01
+#   metrics_path: /exporter
+#   static_configs:
+#     - targets: ['https://head01:8081']
+#
+
+    Configuring CMDaemon to sample metrics from a Prometheus exporter instead is covered in sec-
+tion 3.18.
+
+
+PrometheusExporterRequireCertificate directive
+Syntax: AdvancedConfig = {"PrometheusExporterRequireCertificate=0|1", ...}
+Default: PrometheusExporterRequireCertificate = 1
+
+    PrometheusExporterRequireCertificate is a parameter of the AdvancedConfig (page 888) direc-
+tive.
+
+   • If set to 0, then all users can use the Prometheus service to pull data using CMDaemon.
+
+   • If set to 1, then only users using certificate-based access can use the Prometheus service to pull
+     data using CMDaemon.
+
+    Certificate-based access can be configured as follows:
+    A custom profile with the name prometheus can be created for BCM users with profile mode (sec-
+tion 6.4) as follows:
+                                                                                                    877
+
+[basecm11->profile]% add prometheus
+[basecm11->profile*[prometheus*]]% append tokens PROMETHEUS_EXPORTER_TOKEN
+[basecm11->profile*[prometheus*]]% set nonuser yes
+[basecm11->profile*[prometheus*]]% commit
+
+   A 2048-bit SSL certificate called myprommcert can be created for a non-privileged user prometheus
+with 3650 days validity using the createcertificate command (section 6.4.2) as follows:
+[basecm11->profile[prometheus]]% cert
+[basecm11->cert]% createcertificate 2048 mypromcert "" "" "" "" "" prometheus "" 3650 /tmp/prometheus.key     \
+                    /tmp/prometheus.pem
+Certificate key written to file: /tmp/prometheus.key
+Certificate pem written to file: /tmp/prometheus.pem
+
+   The PEM certificate is the public part of the key pair. The private key must be owned and be readable
+by the Prometheus instance that is scraping from the node exporter.
+   To configure SSL authentication between Prometheus server and the Prometheus exporter node:
+
+   • On the Prometheus server:
+
+        – A directive value of:
+            * 0 means that the session key is a temporary key that is auto-generated for any user
+            * 1 means that the user (the Prometheus server) must provide a certificate
+        – CMDaemon in a default cluster manager installation uses a self-signed certificate. A copy of
+          certificate can be picked up on the head node with:
+          Example
+          [root@basecm11 ~]# ca_cert="/etc/prometheus/cmdaemon-$(hostname)-ca.pem"
+          [root@basecm11 ~]# cat /cm/local/apps/cmd/etc/{cacert,cluster}.pem > ${ca_cert}
+          [root@basecm11 ~]# chmod 600 ${ca_cert}
+
+          The Prometheus server should be configured to specify this CA certificate.
+          If the certificate used by CMDaemon is not a self-signed certificate—that is to say, it is signed
+          by a recognized CA—then the certificate issued by CMDaemon is legitimate, and the Prometheus
+          server does not need to have that CA certificate explicitly specified.
+
+   • The Prometheus exporter always uses TLS, which is automatically managed by CMDaemon.
+
+
+EnablePrometheusPushService directive
+Syntax: EnablePrometheusPushService = true|false
+Default: EnablePrometheusPushService = false
+
+If true, the EnablePrometheusPushService directive allows a Prometheus server to push data to CM-
+Daemon:
+
+Example
+
+myhead # cat <<EOF > "$file"
+myhead # test_prometheus_push{hello="world"} 42
+myhead # EOF
+myhead # curl -k -X POST --data-binary "@$file" https://localhost:8081/prometheuspush/job/test
+878                                                            CMDaemon Configuration File Directives
+
+CMDaemonAudit directive
+Syntax: CMDaemonAudit = yes|no
+Default: CMDaemonAudit = no
+
+When the CMDaemonAudit directive is set to yes, and a value is set for the CMDaemon auditor file with
+the CMDaemonAuditorFile directive, then CMDaemon actions are time-stamped and logged in the CM-
+Daemon auditor file.
+
+
+CMDaemonAuditorFile directive
+Syntax: CMDaemonAuditorFile = path to audit.log file
+or
+Syntax: CMDaemonAuditorFile = path to audit.json file
+or
+Syntax: CMDaemonAuditorFile = http(s) path to JSON server
+
+Default: CMDaemonAuditorFile = "/var/spool/cmd/audit.log"
+
+The CMDaemonAuditorFile directive sets where the audit logs for CMDaemon actions are logged. The
+log format for a .log file in a standard directory path is:
+(time stamp) profile [IP-address] action (unique key)
+Example
+(Mon Jan 31 12:41:37 2011) Administrator [127.0.0.1] added Profile: arbitprof(4294967301)
+
+      The directive can be set in the following kinds of formats:
+   • CMDaemonAuditorFile = "/var/spool/cmd/audit.log"
+   • CMDaemonAuditorFile = "/var/spool/cmd/audit.json"
+   • CMDaemonAuditorFile = "http://<IP address>:<port>/some/path"
+   • CMDaemonAuditorFile = "https://<IP address>:<port>/some/path"
+      A simple POST web service can be faked using netcat:
+Example
+nc -l 1234 -k
+
+      The JSON file always contains a valid array. An RPC call looks like this:
+Example
+...
+
+  "entity": "node001",
+  "rpc":
+    "address": "127.0.0.1",
+    "call": "updateDevice",
+    "service": "cmdevice",
+    "timestamp": 1579185696,
+    "user": "Administrator.root"
+  ,
+  "task_id": 0,
+  "updated": true
+,
+...
+                                                                                                        879
+
+DisableAuditorForProfiles directive
+Syntax: DisableAuditorForProfiles = {profile [, profile] ...}
+Default: DisableAuditorForProfiles = {NODE}
+
+The DisableAuditorForProfiles directive sets the profile for which an audit log for CMDaemon ac-
+tions is disabled. A profile (section 2.3.4) is what allows or denies what CMDaemon may do for that
+profile user. More than one profile can be set as a comma-separated list. New profiles can also be cre-
+ated via the profile mode of cmsh or via the navigation path Identity Management > Profiles > of
+Base View, thus making it possible to disable auditing for arbitrary groups of CMDaemon services.
+
+
+EventLogger directive
+Syntax: EventLogger = true|false
+Default: EventLogger = true
+
+The EventLogger directive sets whether to log events. If active, then by default it logs events to /var/
+spool/cmd/events.log on the active head. If a failover takes place, then the event logs on both heads
+should be checked and merged for a complete list of events.
+   The location of the event log on the filesystem can be changed using the EventLoggerFile directive
+(page 879).
+   Whether events are logged in files or not, events are cached and accessible using cmsh or Base
+View. The number of events cached by CMDaemon is determined by the parameter MaxEventHistory
+(page 879).
+
+
+EventLoggerFile directive
+Syntax: EventLoggerFile = filename
+Default: EventLogger = "/var/spool/cmd/events.log"
+
+The EventLogger directive sets where the events seen in the event viewer (section 10.10) are logged.
+
+
+MaxEventHistory directive
+Syntax: AdvancedConfig = {"MaxEventHistory=number", ...}
+Default: MaxEventHistory=8192
+MaxEventHistory is a parameter of the AdvancedConfig (page 888) directive.
+    By default, when not explicitly set, the maximum number of events that is retained by CMDaemon
+is 8192. Older events are discarded.
+    The parameter can take a value from 0 to 1000000. However, CMDaemon is less responsive with
+larger values, so in that case, setting the EventLogger directive (page 879) to true, to activate logging to
+a file, is advised instead.
+
+
+TimingOverview directive
+Syntax: TimingOverview = filename
+Default: TimingOverview = true|false
+
+If set to true, the TimingOverview directive records timing information for CMDaemon.
+
+TimingOverviewFile directive
+Syntax: TimingOverviewFile = filename
+880                                                           CMDaemon Configuration File Directives
+
+Default: TimingOverviewFile = "/var/spool/cmd/timing.overview.log"
+
+The TimingOverviewFile directive sets the file where the timing data values for CMDaemon go.
+
+
+PublicDNS directive
+Syntax: PublicDNS = true|false
+Default: PublicDNS = false
+
+By default, internal hosts are resolved only if requests are from the internal network. Setting PublicDNS
+to true allows the head node name server to resolve internal network hosts for any network, including
+networks that are on other interfaces on the head node. Separate from this directive, port 53/UDP must
+also be opened up in Shorewall (section 7.2 of the Installation Manual) if DNS is to be provided for queries
+from an external network.
+
+
+MaximalSearchDomains directive
+Syntax: GlobalConfig = {"MaximalSearchDomains = number", ...}
+Default: none
+
+The MaximalSearchDomains directive is a parameter of the GlobalConfig (page 889) directive.
+   By default, the number of names that can be set as search domains used by the cluster has a maxi-
+mum limit of 6. This is a hardcoded limit imposed by the Linux operating system in older versions.
+   More recent versions of glibc (glibc > 2.17-222.el7 in RHEL7) no longer set a limit. How-
+ever using more than 6 search domains currently requires the use of the GlobalConfig directive,
+MaximalSearchDomains. For example, to set 30 domains, the directive setting would be: GlobalConfig
+= { "MaximalSearchDomains=30" }
+
+LockDownDhcpd directive
+Syntax: LockDownDhcpd = true|false
+Default: LockDownDhcpd = false
+
+LockDownDhcpd is a deprecated legacy directive. If set to true, a global DHCP “deny unknown-clients”
+option is set. This means no new DHCP leases are granted to unknown clients for all networks. Un-
+known clients are nodes for which BCM has no MAC addresses associated with the node. The directive
+LockDownDhcpd is deprecated because its globality affects clients on all networks managed by BCM,
+which is contrary to the general principle of segregating the network activity of networks.
+   The recommended way now to deny letting new nodes boot up is to set the option for specific
+networks by using cmsh or Base View (section 3.2.1: figure 3.5 and table 3.1). Setting the cmd.conf
+LockDownDhcpd directive overrides lockdowndhcpd values set by cmsh or Base View.
+
+MaxNumberOfProvisioningThreads directive
+Syntax: MaxNumberOfProvisioningThreads = number
+Default: MaxNumberOfProvisioningThreads = 10000
+
+The MaxNumberOfProvisioningThreads directive specifies the cluster-wide total number of nodes that
+can be provisioned simultaneously. Individual provisioning servers typically define a much lower
+bound on the number of nodes that may be provisioned simultaneously.
+                                                                                                     881
+
+SetupBMC directive
+Syntax: SetupBMC = true|false
+Default: SetupBMC = true
+
+Automatically configure the username and password for the BMC interface of the head node. This may
+also be valid for regular nodes. The SetupBMC directive should not be confused with the setupBmc field
+of the node-installer configuration file, described in section 5.8.7.
+    The node-installer normally takes care of BMC interface configuration on regular nodes by acting on
+the node-installer configuration file field setupBmc. The CMDaemon directive SetupBMC can only work
+on regular nodes if the node-installer is not configuring the regular nodes. If the boolean parameters
+installbootrecord and allownetworkingrestart for a regular node are set to yes, then the SetupBMC
+directive is able to work for that regular node. Setting the boolean parameters at category level also
+makes the directive work for the associated nodes.
+
+
+BMCSessionTimeout directive
+Syntax: BMCSessionTimeout = number
+Default: BMCSessionTimeout = 2000
+
+The BMCSessionTimeout specifies the time-out for BMC calls in milliseconds.
+
+
+BMCIdentifyScript directive
+Syntax: AdvancedConfig = {"BMCIdentify=filename", ...}
+Default: unset
+BMCIdentifyScript is a parameter of the AdvancedConfig (page 888) directive.
+    The parameter takes a full file path to a script that can be used for identification with a BMC (sec-
+tion 3.7.4).
+
+
+BMCIdentifyScriptTimeout directive
+Syntax: AdvancedConfig = {"BMCIdentifyScriptTimeout=number from 1 to 360", ...}
+Default: 60
+BMCIdentifyScriptTimeout is a parameter of the AdvancedConfig (page 888) directive.
+   CMDaemon waits at the most BMCIdentifyScriptTimeout seconds for the script used by the
+BMCIdentify directive to complete.
+
+BMCIdentifyCache directive
+Syntax: AdvancedConfig = {"BMCIdentifyCache=0|1", ...}
+Default: 1
+BMCIdentifyCache is a parameter of the AdvancedConfig (page 888) directive.
+   If set to 1, then CMDaemon remembers the last value of the output of the script used by the
+BMCIdentify directive.
+
+SnmpSessionTimeout directive
+Syntax: SnmpSessionTimeout = number
+Default: SnmpSessionTimeout = 500000
+
+The SnmpSessionTimeout specifies the time-out for SNMP calls in microseconds.
+882                                                          CMDaemon Configuration File Directives
+
+PowerOffPDUOutlet directive
+Syntax: PowerOffPDUOutlet = true|false
+Default: PowerOffPDUOutlet = false
+
+Enabling the PowerOffPDUOutlet directive allows PDU ports to be powered off for clusters that have
+both PDU and IPMI power control. Section 4.1.3 has more on this.
+
+
+PowerThreadPoolSize directive
+Syntax: AdvancedConfig = {"PowerThreadPoolSize=<integer>", ...}
+Default: PowerThreadPoolSize=32
+
+PowerThreadPoolSize is a parameter of the AdvancedConfig (page 888) directive.
+   The parameter can take positive integer values. Increasing its value increases the number of threads
+that are used to power up the nodes in a cluster (section 4.2.3), so that the cluster is fully operational
+quicker. The administrator should however take into account the power surge due to increasing the
+number of threads (number of subprocesses ) before increasing the value beyond its default.
+
+
+DisableBootLogo directive
+Syntax: DisableBootLogo = true|false
+Default: DisableBootLogo = false
+
+When DisableBootLogo is set to true, the BCM logo is not displayed on the first boot menu when nodes
+PXE boot.
+
+
+StoreBIOSTimeInUTC directive
+Syntax: StoreBIOSTimeInUTC = true|false
+Default: StoreBIOSTimeInUTC = false
+
+When StoreBIOSTimeInUTC is set to true, the system relies on the time being stored in BIOS as being
+UTC rather than local time.
+
+
+FreezeChangesTo<wlm>Config directives:
+FreezeChangesToPBSPro directive
+FreezeChangesToSlurmConfig directive
+FreezeChangesToLSFConfig directive
+Syntax: FreezeChangesTo<wlm>Config= true|false
+Default: FreezeChangesTo<wlm>Config = false
+
+When FreezeChangesTo<wlm>Config is set to true, the CMDaemon running on that node does not
+make any modifications to the workload manager configuration for that node. Workload managers for
+which this value can be set are:
+   • PBSPro
+
+   • Slurm
+
+   • LSF
+   Monitoring of jobs, and workload accounting and reporting continues for frozen workload man-
+agers.
+                                                                                                       883
+
+    Upgrades to newer workload manager versions may still require some manual adjustments of the
+configuration file, typically if a newer version of the workload manager configuration changes the syn-
+tax of one of the options in the file.
+
+
+FrozenFile directive
+Syntax: FrozenFile = { filename[, filename]... }
+Example: FrozenFile = { "/etc/dhcpd.conf", "/etc/postfix/main.cf" }
+The FrozenFile directive is used to prevent the CMDaemon-maintained sections of configuration files
+from being automatically generated. This is useful when site-specific modifications to configuration files
+have to be made.
+    The filewriteinfo command (section A.2) can be run from device mode to see which files are
+frozen. The output in the Frozen column then shows which files are protected from CMDaemon-
+managed changes.
+    To avoid problems, the file that is frozen should not be a symlink, but should be the ultimate destina-
+tion file. The readlink -f <symlinkname> command returns the ultimate destination file of a symlink
+called <symlinkname>. This is also the case for an ultimate destination file that is reached via several
+chained symlinks.
+
+FrozenFile directive for regular nodes
+FrozenFile directive for regular nodes for CMDaemon
+The FrozenFile directive can be used within the cmd.conf file of the regular node.
+
+Example
+
+To freeze the file /etc/named.conf on the regular nodes running with the image default-image, the file:
+
+   /cm/images/default-image/cm/local/apps/cmd/etc/cmd.conf
+
+can have the following directive set in it:
+
+   FrozenFile = { "/etc/named.conf" }
+
+   The path of the file that is to be frozen on the regular node must be specified relative to the root of
+the regular node.
+   The running node should then have its image updated. This can be done with the imageupdate
+command in cmsh (section 5.6.2), or the Update node button in Base View (section 5.6.3). After the
+update, CMDaemon should be restarted within that category of nodes:
+
+Example
+
+[root@basecm11 ~]# pdsh -v -g category=default systemctl restart cmd
+node002: Waiting for CMDaemon (25129) to terminate...
+node001: Waiting for CMDaemon (19645) to terminate...
+node002: [ OK ]
+node001: [ OK ]
+node002: Waiting for CMDaemon to start...[ OK ]
+node001: Waiting for CMDaemon to start...[ OK ]
+
+FrozenFile regex specification
+The FrozenFile directive allows regexes to be used for a path, if the path begins with the | character:
+
+Example
+884                                                             CMDaemon Configuration File Directives
+
+[root@head current]# egrep -e '^FrozenFile' /cm/local/apps/cmd/etc/cmd.conf
+FrozenFile = { "/etc/postfix/main.cf", "|/cm/images/.*?/etc/postfix/main.cf" }
+   In the preceding entry, all image directories under /cm/images/ are matched for the path
+etc/postfix/main.cf.
+
+FrozenFile directive for regular nodes for the node-installer
+CMDaemon directives only affect files on a regular node after CMDaemon starts up on the node during
+the init stage. So files frozen by the CMDaemon directive stay unchanged by CMDaemon after this
+stage, but they may still be changed before this stage.
+    Freezing files so that they also stay unchanged during the pre-init stage—that is during the node-
+installer stage—is possible with node-installer directives.
+    Node-installer freezing is independent of CMDaemon freezing, which means that if a file freeze is
+needed for the entire startup process as well as beyond, then both a node-installer as well as a CMDae-
+mon freeze are sometimes needed.
+    Node-installer freezes can be done with the node-installer directives in /cm/node-installer/
+scripts/node-installer.conf, introduced in section 5.4:
+   • frozenFilesPerNode
+   • frozenFilesPerCategory
+For the node-installer.conf file in multidistro and multiarch (section 9.7) configurations, the directory
+path /cm/node-installer takes the form:
+   /cm/node-installer-<distribution>-<architecture>
+The values for <distribution> and <architecture> can take the values outlined on page 552.
+Example
+Per node:
+frozenFilesPerNode =     "*:/localdisk/etc/ntp.conf", "node003:/localdisk/etc/hosts"
+   Here, the * wildcard means that no restriction is set. Setting node003 means that only node003 is
+frozen.
+Example
+Per category:
+frozenFilesPerCategory =      "mycategory:/localdisk/etc/sysconfig/network-scripts/ifcfg-eth1"
+      Here, the nodes in the category mycategory are prevented from being changed by the node-installer.
+
+Is A FrozenFile Directive Always Needed?
+A FrozenFile directive is not always needed because in some cases a workaround is possible.
+   In a configuration file after a node is fully up, the effect of a statement earlier on can often be
+overridden by a statement later in the file. So, the following useful behavior is independent of
+whether FrozenFile is being used for a configuration file or not: A configuration file, for example
+/etc/postfix/main.cf, with a configuration statement in an earlier CMDaemon-maintained part of
+the file, for example:
+mydomain = eth.cluster
+can often be overridden by a statement later on outside the CMDaemon-maintained part of the file:
+mydomain = eth.gig.cluster
+    Using FrozenFile in CMDaemon or the node-installer can thus sometimes be avoided by the use of
+such overriding statements later on.
+    Whether overriding later on is possible depends on the software being configured. It is true for Post-
+fix configuration files, for example, but it may not be so for the configuration files of other applications.
+                                                                                                   885
+
+EaseNetworkValidation directive
+Syntax: EaseNetworkValidation = 0|1|2
+Default: EaseNetworkValidation = 0
+
+CMDaemon enforces certain requirements on network interfaces and management/node-booting net-
+works by default. In heavily customized setups, such as is common in Type 3 networks (section 3.3.9 of
+the Installation Manual), the user may wish to disable these requirements.
+
+   • 0 enforces all requirements.
+
+   • 1 allows violation of the requirements, with validation warnings. This value should never be set
+     except under instructions from BCM support.
+
+   • 2 allows violation of the requirements, without validation warnings. This value should never be
+     set except under instructions from BCM support.
+
+
+CustomUpdateConfigFileScript directive
+Syntax: CustomUpdateConfigFileScript = filename
+Default: commented out in the default cmd.conf file
+
+Whenever one or more entities have changed, the custom script at filename, specified by a full path, is
+called 30s later. Python bindings can be used to get information on the current setup.
+
+
+ConfigDumpPath directive
+Syntax: ConfigDumpPath = filename
+Default: ConfigDumpPath = /var/spool/cmd/cmdaemon.config.dump
+
+The ConfigDumpPath directive sets a dump file for dumping the configuration used by the power control
+script /cm/local/apps/cmd/scripts/pctl/pctl. The pctl script is a fallback script to allow power
+operations if CMDaemon is not running.
+
+   • If no directive is set (ConfigDumpPath = ""), then no dump is done.
+
+   • If a directive is set, then the administrator must match the variable cmdconfigfile in the
+     powercontrol configuration file /cm/local/apps/cmd/scripts/pctl/config.py to the value of
+     ConfigDumpPath. By default, the value of cmdconfigfile is set to /var/spool/cmd/cmdaemon.
+     config.dump.
+
+SyslogHost directive
+Syntax: SyslogHost = hostname
+Default: SyslogHost = "localhost"
+
+The SyslogHost directive specifies the hostname of the syslog host.
+
+
+SyslogFacility directive
+Syntax: SyslogFacility = facility
+Default: SyslogFacility = "LOG_LOCAL6"
+
+The default value of LOG_LOCAL6 is set in:
+
+   • /etc/rsyslog.conf in RHEL, Ubuntu.
+886                                                                      CMDaemon Configuration File Directives
+
+     • /etc/syslog-ng/syslog-ng.conf in SLES versions
+
+These are the configuration files for the default syslog daemons syslog, rsyslog, and syslog-ng,
+respectively, that come with the distribution.      BCM redirects messages from CMDaemon to
+/var/log/cmdaemon only for the default syslog daemon that the distribution provides. So, if another
+syslog daemon other than the default is used, then the administrator has to configure the non-default
+syslog daemon facilities manually.
+   The value of facility must be one of: LOG_KERN, LOG_USER, LOG_MAIL, LOG_DAEMON, LOG_AUTH,
+LOG_SYSLOG or LOG_LOCAL0..7
+
+NameServerLocalhostLocation directive
+Syntax: AdvancedConfig = {"NameServerLocalhostLocation=0|1", ...}
+Default: NameServerLocalhostLocation=0
+
+NameServerLocalhostLocation is a parameter of the AdvancedConfig (page 888) directive.
+   When set to 1, the location of the localhost as specified by the nameserver directive in
+/etc/resolv.conf is moved to the bottom of the list of nameserver entries. The default value of 0
+places it at the top of those entries.
+
+ResolveToExternalName directive
+Syntax: ResolveToExternalName = true|false
+Default: ResolveToExternalName = false
+
+The value of the ResolveToExternalName directive determines under which domain name the primary
+and secondary head node hostnames are visible from within the head nodes, and to which IP addresses
+their hostnames are resolved. Enabling this directive resolves the head nodes’ hostnames to the IP
+addresses of their external interfaces.
+   Thus, on head nodes and regular nodes in both single-head and failover clusters
+
+     • with ResolveToExternalName disabled, the master hostname and the actual hostname of the head
+       node (e.g. head1, head2) by default always resolve to the internal IP address of the head node.
+
+     • with ResolveToExternalName enabled, the master hostname and the actual hostname of the head
+       node (e.g. head1, head2) by default always resolve to the external IP address of the head node.
+
+      The resolution behavior can be summarized by the following table:
+
+                      ResolveToExternalName Directive Effects
+ on simple head,              on failover head,            on regular node,     Using
+       resolving:                resolving:                    resolving:        the
+ master       head      master     head1      head2        master    head(s)    DNS?
+                         ResolveToExternalName = False
+ I            I         I          I          I            I         I          No
+ I            I         I          I          I            I         I          Yes
+                            ResolveToExternalName = True
+ E            E         E          E          E            E         E          No
+ E            E         E          E          E            E         E          Yes
+       Key:   I: resolves to internal IP address of head
+              E: resolves to external IP address of head
+                                                                                                      887
+
+   The system configuration files on the head nodes that get affected by this directive include /etc/hosts
+and, on SLES systems, also the /etc/HOSTNAME. Also, the DNS zone configuration files get affected.
+   Additionally, in both the single-head and failover clusters, using the “hostname -f” command on
+a head node while ResolveToExternalName is enabled results in the host’s Fully Qualified Domain
+Name (FQDN) being returned with the host’s external domain name. That is, the domain name of the
+network that is specified as the "External network" in the base partition in cmsh (the output of “cmsh -c
+"partition use base; get externalnetwork"”).
+   Modifying the value of the ResolveToExternalName directive and restarting the CMDaemon while
+important system services (e.g. Slurm) are running should not be done. Doing so is likely to cause
+problems with accessing such services due to them then running with a different domain name than the
+one with which they originally started.
+   On a tangential note that is closely, but not directly related to the ResolveToExternalName directive:
+the cluster can be configured so that the “hostname -f” command executed on a regular node returns
+the FQDN of that node, and so that the FQDN in turn resolves to an external IP for that regular node.
+The details on how to do this are in the BCM Knowledge Base at http://kb.brightcomputing.com/. A
+search query for FQDN leads to the relevant entry.
+
+
+ResolveMasterToExternalName directive
+Syntax: AdvancedConfig = {"ResolveMasterToExternalName=0|1", ...}
+Default: ResolveMasterToExternalName = 1
+
+ResolveMasterToExternalName is a parameter of the AdvancedConfig (page 888) directive.
+    ResolveMasterToExternalName can only be used if ResolveToExternalName (page 886) is active.
+    If set to 1 (the default), then the master head node, as specified by the name master, resolves to the
+IP address as set by ResolveToExternalName.
+    If set to 0 then the master head node resolves to the internal shared IP address.
+
+
+ResolveMasterToExternalDomainName directive
+Syntax: AdvancedConfig = {"ResolveMasterToExternalDomainName=0|1", ...}
+Default: ResolveMasterToExternalDomainName = 1
+
+ResolveMasterToExternalDomainName is a parameter of the AdvancedConfig (page 888) directive.
+    ResolveMasterToExternalDomainName can only be used if ResolveToExternalName (page 886) is
+active.
+    The external domain name as defined for the external network, in the form master.<external do-
+main>, can be used in /etc/hosts during name resolution.
+    If set to 1 (the default), then the external domain name is used in /etc/hosts.
+    If set to 0, then the external domain name is not used in /etc/hosts.
+    Resolution occurs as shown in the following table:
+888                                                                      CMDaemon Configuration File Directives
+
+                  ResolveMasterToExternalDomainName Directive Effects
+ on simple head,                on failover head,          on regular node,     Using
+       resolving:                  resolving:                  resolving:        the
+ master       head        master     head1      head2      master    head(s)    DNS?
+                          ResolveToExternalName = False
+ I            I           I          I          I          I         I          No
+ I            I           I          I          I          I         I          Yes
+                              ResolveToExternalName = True
+ E            E           I          E          E          I         I          No
+ E            E           I          E          E          I         E          Yes
+       Key:   I: resolves to internal IP address of head
+              E: resolves to external IP address of head
+
+
+DisableLua directive
+Syntax: DisableLua = true|false
+Default: DisableLua = false
+
+The value of the DisableLua directive determines if Lua code (section L.6) used in monitoring expres-
+sions can be executed.
+
+
+AdvancedConfig directive
+Syntax: AdvancedConfig = { "<key1>=<value1>", "<key2>=<value2>", ... }
+Default: Commented out in the default cmd.conf file
+ The AdvancedConfig directive is not part of the standard directives. It takes a set of key/value pairs
+as parameters, with each key/value pair allowing a particular functionality, and is quite normal in
+that respect. However, the functionality of a parameter to this directive is often applicable only under
+restricted conditions, or for non-standard configurations. The AdvancedConfig parameters are therefore
+generally not recommended for use by the administrator, nor are they generally documented.
+    Like for the other directives, only one AdvancedConfig directive line is used. This means that what-
+ever functionality is to be enabled by this directive, its corresponding parameters must be added to that
+one line. These key/value pairs are therefore added by appending them to any existing AdvancedConfig
+key/value pairs, which means that the directive line can be a long list of key/value pairs to do with a
+variety of configurations.
+
+Managing Key/Value Pairs With The cm-manipulate-advanced-config.py Utility
+The cm-manipulate-advanced-config.py utility can be used to make it easier to manage AdvancedConfig
+key/value pairs.
+   For example, to add a key/value pair key8=value8:
+
+[root@basecm11 ~]# cm-manipulate-advanced-config.py key8=value8
+Updated: /cm/local/apps/cmd/etc/cmd.conf
+
+      To show the current state of the AdvancedConfig, the -s|--show option can be used:
+
+[root@basecm11 ~]# cm-manipulate-advanced-config.py -s
+=== /cm/local/apps/cmd/etc/cmd.conf ===
+VirtualCluster=1
+key8=value8
+
+      A key/value pair can be removed by specifying its key with the -r|--remove option:
+                                                                                                    889
+
+[root@basecm11 ~]# cm-manipulate-advanced-config.py -r key8
+Updated: /cm/local/apps/cmd/etc/cmd.conf
+[root@basecm11 ~]# cm-manipulate-advanced-config.py -s
+=== /cm/local/apps/cmd/etc/cmd.conf ===
+VirtualCluster=1
+
+   The utility can be used on cmd.conf in node images too, using the -i|--image option.
+
+[root@basecm11 ~]# cm-manipulate-advanced-config.py -i /cm/images/default-image
+Updated: /cm/images/default-image/cm/local/apps/cmd/etc/cmd.conf
+
+   The -q option causes the utility to exit with code 1 if cmd.conf has changed.
+   Further options can be seen with the -h|--help option.
+
+
+GlobalConfig directive
+Syntax: GlobalConfig = { "<key1>=<value1>", "<key2>=<value2>", ... }
+Default: not in the default cmd.conf file
+ The GlobalConfig directive is not part of the standard directives. It takes a set of key/value pairs as
+parameters, with each key/value pair allowing a particular functionality, and is quite normal in that
+respect. However, the parameter to this directive only needs to be specified on the head node. The
+non-head node CMDaemons take this value upon connection, which means that the cmd.conf file on
+the non-head nodes do not need to have this specified.
+   This allows nodes to set up, for example, their search domains using the MaximalSearchDomains
+GlobalConfig directive (page 880).
+   Like for the other directives, only one GlobalConfig directive line is used. This means that whatever
+functionality is to be enabled by this directive, its corresponding parameters must be added to that
+one line. These key/value pairs are therefore added by appending them to any existing GlobalConfig
+key/value pairs, which means that the directive line can be a long list of key/value pairs to do with a
+variety of configurations.
+
+
+ScriptEnvironment directive
+Syntax: ScriptEnvironment = { "CMD_ENV1=<value1>", "CMD_ENV2=<value2>", ... }
+Default: Commented out in the default cmd.conf file
+
+The ScriptEnvironment directive sets extra environment variables for CMDaemon and child processes.
+    For example, if CMDaemon is running behind a web proxy, then the environment variable
+http_proxy may need to be set for it. If, for example, the proxy is the host brawndo, and it is accessed
+via port 8080 using a username/password pair of joe/electrolytes, then the directive becomes:
+
+ScriptEnvironment = { "http_proxy=joe:electrolytes@brawndo:8080" }
+
+
+BurnSpoolDir directive
+Syntax: BurnSpoolDir = path
+Default: BurnSpoolDir = "/var/spool/burn/"
+
+    The BurnSpoolDir directive specifies the directory under which node burn log files are placed (Chap-
+ter 11 of the Installation Manual). The log files are logged under a directory named after the booting
+MAC address of the NIC of the node. For example, for a MAC address of 00:0c:29:92:55:5e the directory
+is /var/spool/burn/00-0c-29-92-55-5e.
+890                                                           CMDaemon Configuration File Directives
+
+IdleThreshold directive
+Syntax: IdleThreshold = number
+Default: IdleThreshold = 1.0
+
+The IdleThreshold directive sets a threshold value for loadone. If loadone exceeds this value, then
+data producers that have Only when idle (page 583) set to true (enabled), will not run. If the data
+producer is sampled on a regular node rather than on the head node, then cmd.conf on the regular node
+should be modified and its CMDaemon restarted.
+
+
+MonitoringPath directive
+Syntax: AdvancedConfig = {"MonitoringPath=path", ...}
+Default: Implicit value: "MonitoringPath=/var/spool/cmd/monitoring/"
+
+MonitoringPath is a parameter of the AdvancedConfig (page 888) directive.
+   Its value determines the path of the directory in which monitoring data is saved (section 14.8).
+
+
+MaxServiceFailureCount directive
+Syntax: AdvancedConfig = {"MaxServiceFailureCount=number", ...}
+Default: Implicit value: "MaxServiceFailureCount=10"
+
+MaxServiceFailureCount is a parameter of the AdvancedConfig (page 888) directive.
+   Its value determines the number of times a service failure event is logged (page 177). Restart attempts
+on the service still continue when this number is exceeded.
+
+
+InitdScriptTimeout directive
+Syntax: AdvancedConfig = {"InitdScriptTimeout[.service]=timeout", ...}
+Default: Implicit value: "InitdScriptTimeout=30"
+
+InitdScriptTimeout is a parameter of the AdvancedConfig (page 888) directive. It can be set globally
+or locally:
+
+   • Global (all services)
+     InitdScriptTimeout can be set as a global value for init scripts, by assigning timeout as a period
+     in seconds. If an init script fails to start up its service within this period, then CMDaemon kills the
+     service and attempts to restart it.
+
+        – If InitdScriptTimeout has a value for timeout set, then all init scripts have a default timeout
+          of timeout seconds.
+        – If InitdScriptTimeout has no timeout value set, then all init scripts have a default timeout of
+          30 seconds.
+
+   • Local (for a specific service)
+     If InitdScriptTimeout.service is assigned a timeout value, then the init script for that service times
+     out in timeout seconds. This timeout overrides, for that service only, any existing global default
+     timeout.
+
+   When a timeout happens for an init script attempting to start a service, the event is logged. If the
+number of restart attempts exceeds the value determined by the MaxServiceFailureCount directive
+(page 890), then the event is no longer logged, but the restart attempts continue.
+
+Example
+                                                                                                            891
+
+An fhgfs startup takes a bit longer than 30 seconds, and therefore times out with the default timeout
+value of 30s. This results in the following logs in /var/log/cmdaemon:
+
+cmd: [SERVICE] Debug: ProgramRunner: /etc/init.d/fhgfs-client restart
+[DONE] 0 9
+cmd: [SERVICE] Debug: /etc/init.d/fhgfs-client restart, exitcode = 0,
+signal = 9
+
+   Here, service is fhgfs-client, so setting the parameter can be done with:
+
+AdvancedConfig = { ..., "initdScriptTimeout.fhgfs-client=60", ...}
+
+This allows a more generous timeout of 60 seconds instead.
+   Restarting CMDaemon then should allow the fhgs startup to complete
+
+# systemctl restart cmd
+
+   A more refined approach that avoids a complete CMDaemon restart would be to execute a reset
+(page 177) on the fhgfs-client from within CMDaemon, as follows:
+[basecm11->category[default]->services[fhgfs-client]]% reset fhgfs-client
+Successfully reset service fhgfs-client on: node001,node002
+[basecm11->category[default]->services[fhgfs-client]]%
+
+
+CMDaemonListenOnInterfaces directive
+Syntax: AdvancedConfig = {"CMDaemonListenOnInterfaces=<interfaces>", ...}
+Default: all interfaces listening to port 8081
+
+CMDaemonListenOnInterfaces is a parameter of the AdvancedConfig (page 888) directive.
+    When set explicitly, CMDaemon listens only to the interfaces listed in <interfaces>. The form of <in-
+terfaces> is a comma-separated list of interface device names:
+
+Example
+
+CMDaemonListenOnInterfaces=eth0,eth1,eth0:0,eth0:1
+
+  If the interface list item lo is omitted from the list of names, it will still be listened to. This is because
+CMDaemon must always be able to talk to itself on the loopback interface.
+
+
+DisableInotifyInterface directive
+Syntax: AdvancedConfig = {"DisableInotifyInterface =0|1"}
+Default: 0
+
+DisableInotifyInterface is a parameter of the AdvancedConfig (page 888) directive.
+   When set to 1 CMDaemon ignores inotify events from all interfaces.
+   When set to 0 CMDaemon does not ignore inotify events from all interfaces.
+
+
+IgnoreInotifyInterface directive
+Syntax: AdvancedConfig = {"IgnoreInotifyInterface =<interfaces>", ...}
+Syntax: GlobalConfig = {"IgnoreInotifyInterface =<interfaces>", ...}
+Default: veth*,lxc*,fg-*,qg-*,qr-*,sg-*,tbr-*,qbr*,qvb*,qvo*,cali*,flannel*,ecu_*,chassis_*,
+enx*,az*,tap*,rdma*,cni0,/[a-f0-9]12_[hc]/
+892                                                            CMDaemon Configuration File Directives
+
+    In the preceding lines showing the value for Default, the line ending with chassis_*, must be concatenated
+to the line starting with enx*,
+IgnoreInotifyInterface is a parameter of the AdvancedConfig (page 888) directive, as well as the
+GlobalConfig (page 889) directive.
+    IgnoreInotifyInterface is active if DisableInotifyInterface is 0.
+    By default, the directive has CMDaemon ignore the normally harmless messages that are typically
+generated by Kubernetes as Calico creates and removes interfaces.
+    CMDaemon ignores events from the interfaces listed in <interfaces>. The form of <interfaces> is a
+comma-separated list of interface device names, with some globbing allowed.
+
+
+CookieCooldownTime directive
+Syntax: AdvancedConfig = {"CookieCooldownTime=number from 60 to 86400", ...}
+Default: 900
+
+CookieCooldownTime is a parameter of the AdvancedConfig (page 888) directive.
+   It defines the number of seconds until the Base View connection to CMDaemon times out, if there is
+no user activity at the Base View client side.
+
+
+DHCPMaxleaseTime directive
+Syntax: AdvancedConfig = {"DHCPMaxleaseTime=number", ...}
+Default: client default
+
+DHCPMaxleaseTime is a parameter of the AdvancedConfig (page 888) directive.
+   DHCPMaxleaseTime sets max-lease-time in DHCPOFFER. This is the maximum lease time, in sec-
+onds, that the DHCP server on the head node allows to the DHCP client on the node.
+
+
+SlurmDisableAccountingParsing directive
+Syntax: AdvancedConfig = {"SlurmDisableAccountingParsing=0|1", ...}
+Default: 0
+
+SlurmDisableAccountingParsing is a parameter of the AdvancedConfig (page 888) directive. If set to
+1, it disables collection of accounting information for the Slurm workload manager.
+
+SlurmStraightExtraTopology directive
+Syntax: AdvancedConfig = {"SlurmStraightExtraTopology=0|1", ...}
+Default: 1
+
+SlurmStraightExtraTopology is a parameter of the AdvancedConfig (page 888) directive. If set to 0,
+then the order of switches is reversed when setting extra values for SlurmTopology (page 396).
+
+
+SlurmConcatTopologySwitchName directive
+Syntax: AdvancedConfig = {"SlurmConcatTopologySwitchName=0|1", ...}
+Default: 0
+
+SlurmConcatTopologySwitchName is a parameter of the AdvancedConfig (page 888) directive. If set to
+1, then it allows concatenation of the switch names in the topology defined via the SlurmTopology extra
+values (page 396).
+                                                                                                       893
+
+JobsSamplingMetricsInterval directive
+Syntax: AdvancedConfig = {"JobsSamplingMetricsInterval=<number>", ...}
+Default: 60
+
+JobsSamplingMetricsInterval is a parameter of the AdvancedConfig (page 888) directive. Its value
+is a time period, in seconds, and it applies only to metrics associated with job queues. Such metric
+sampling is carried out with this time period if job queues are added, or if job queues are re-created
+after disappearing.
+
+
+MembershipQueryInterval directive
+Syntax: AdvancedConfig = {"MembershipQueryInterval=<number>", ...}
+Default: 4
+MembershipQueryInterval is a parameter of the AdvancedConfig (page 888) directive. Its value is a
+time period, in seconds. This time period value elapses between the checks that CMDaemon makes to
+determine the node states (section 5.5) in a cluster. If the network is very congested, then a larger value
+can be used to reduce the network load caused by these checks.
+
+
+AddUserPasswordReset directive
+Syntax: AdvancedConfig = {"AddUserPasswordReset=0|1", ...}
+Default: 0
+
+AddUserPasswordReset is a parameter of the AdvancedConfig (page 888) directive. If this parameter is
+set to 1, then an LDAP user added after the change is in effect is forced to change their password on first
+login:
+
+Example
+
+root@basecm11:~# cm-manipulate-advanced-config.py -g AddUserPasswordReset=1
+Updated: /cm/local/apps/cmd/etc/cmd.conf
+root@basecm11:~# service cmd restart
+
+root@basecm11:~# cmsh
+[basecm11]% user
+[basecm11->user]% add joe
+[basecm11->user*[joe*]]% set password joe
+[basecm11->user*[joe*]]% commit
+[basecm11->user[joe]]%
+
+root@basecm11:~# ssh joe@localhost
+joe@localhost's password:
+Password must be changed
+...
+WARNING: Your password has expired.
+You must change your password now and login again!
+(current) LDAP Password:
+New password:
+Retype new password:
+passwd: password updated successfully
+Connection to localhost closed.
+
+root@basecm11:~# ssh joe@localhost
+joe@localhost's password:
+894                                                          CMDaemon Configuration File Directives
+
+joe@basecm11:~$
+
+    With the AdvancedConfig configuration in effect, an already-existing user can also be forced to
+change password on the next login, after the extra variable pwdReset is set to true for that already-
+existing user. For example, for a user fred, executing the following:
+
+Example
+
+[basecm11->user[fred]]% set -e pwdReset true
+[basecm11->user*[fred*]]% commit
+
+      means that fred is forced to change password on the next login.
+
+
+AddUserScript directive
+Syntax: AdvancedConfig = {"AddUserScript=<path>", ...}
+Default: none
+
+AddUserScript is a parameter of the AdvancedConfig (page 888) directive. If this parameter is set to a
+path leading to a script, and if a new user is added using cmsh or Base View, then the script is automati-
+cally run by CMDaemon, with the username of the new user automatically passed as the first argument
+to the script. The script has a default timeout of 5 seconds.
+
+
+AddUserScriptPasswordInEnvironment directive
+Syntax: AdvancedConfig = {"AddUserScriptPasswordInEnvironment=0|1", ...}
+Default: 0
+
+AddUserScriptPasswordInEnvironment is a parameter of the AdvancedConfig (page 888) directive. If
+this parameter is set to 1, then CMDaemon passes the CMD_USER_PASSWORD environment variable to the
+script defined by the AddUserScript directive.
+
+
+RemoveUserScript directive
+Syntax: AdvancedConfig = {"RemoveUserScript=<path>", ...}
+Default: none
+
+RemoveUserScript is a parameter of the AdvancedConfig (page 888) directive. If this parameter is set to
+a path leading to a script, and if an existing user is removed using cmsh or Base View, then the script is
+automatically run by CMDaemon. The script has a default timeout of 5 seconds.
+
+
+AddUserScriptTimeout directive
+Syntax: AdvancedConfig = {"AddUserScriptTimeout=<number>", ...}
+Default: 5
+
+AddUserScriptTimeout is a parameter of the AdvancedConfig (page 888) directive. It sets the timeout
+value in seconds, for the script set by AddUserScript.
+
+
+RemoveUserScriptTimeout directive
+Syntax: AdvancedConfig = {"RemoveUserScriptTimeout=<number>", ...}
+Default: 5
+                                                                                                       895
+
+RemoveUserScriptTimeout is a parameter of the AdvancedConfig (page 888) directive. It sets the time-
+out value in seconds, for the script set by RemoveUserScript.
+
+AutomaticMountAll directive
+Syntax: AutomaticMountAll=0|1
+Default: 1
+
+    If the AutomaticMountAll directive is set to the default of 1, then a mount -a operation is carried out
+when a mount change is carried out by CMDaemon.
+    The mount -a operation has to do with attempting to mount devices listed in /etc/fstab. It should
+not be confused with auto-mounting of filesystems, which has to do with mounting an arbitrary device
+to a filesystem automatically.
+    If the AutomaticMountAll directive is set to 0, then /etc/fstab is written, but the mount -a com-
+mand is not run by CMDaemon. However, the administrator should be aware that since mount -a is
+run by the distribution during booting, a node reboot implements the mount change.
+
+AllowImageUpdateWithAutoMount directive
+Syntax: AdvancedConfig = {"AllowImageUpdateWithAutoMount=0|1|2|3", ...}
+Default: 0
+
+    The AllowImageUpdateWithAutoMount directive is a parameter of the AdvancedConfig (page 888)
+directive. The values it takes decide how an auto-mounted filesystem should be dealt with during
+image updates (section 5.6.2) or grab to image (syncing node-to-image, section 9.5.2). It must be set in
+cmd.conf per software image or per node where the automount is running, and the changes activated
+as usual, as described on page 869.
+
+     Value   Description
+    0        If auto-mount is running, abort provisioning (default)
+    1        If auto-mount is running, warn but continue
+    2        Do not check auto-mount status. This saves a little time, but it risks data loss,
+             unless the automounted filesystem has been added to excludelistupdate. If
+             the automounted filesystem is not added to excludelistupdate, then if the au-
+             tomounted filesystem happens to be unavailable at the time that an image up-
+             date is carried out, then the rsync process can end up deleting the automounted
+             filesystem contents during the rsync, because it assumes that content should not
+             be there.
+    3        Pretend auto-mount is running. This prevents an image update
+
+    How an auto-mounted filesystem can be configured using the autofs service in BCM is discussed
+in section 3.14. The need for adding the automounted filesystem to excludelistupdate is discussed on
+page 286.
+
+
+DNS::options_allow-query directive
+Syntax: AdvancedConfig = {"DNS::options_allow-query=<subnet1>, <subnet2>, ...", ...}
+Default: unset
+
+The DNS::options_allow-query directive is a parameter of the AdvancedConfig (page 888) directive. If
+a subnet value is specified, in CIDR notation, then that subnet can query the DNS running on the head
+896                                                         CMDaemon Configuration File Directives
+
+node. Setting a subnet places an entry within the allow-query section of /etc/named.conf.
+   The standard directive PublicDNS (page 880) simply adds the entry 0.0.0.0/0 to the allow-query
+section and can be used if no specific subnet needs to be added.
+
+
+CipherList directive
+Syntax: AdvancedConfig = {"CipherList=<ciphers>", ...}
+Default: CipherList=ALL:!aNULL:!eNULL
+
+The CipherList directive is a parameter of the AdvancedConfig (page 888) directive. It sets the cipher
+list of the OpenSSL suite that CMDaemon negotiates with clients. Ciphers in the cipher list can be
+viewed with:
+
+Example
+
+[root@basecm11 ~]# openssl ciphers -v
+ECDHE-RSA-AES256-GCM-SHA384 TLSv1.2 Kx=ECDH     Au=RSA Enc=AESGCM(256) Mac=AEAD
+ECDHE-ECDSA-AES256-GCM-SHA384 TLSv1.2 Kx=ECDH     Au=ECDSA Enc=AESGCM(256) Mac=AEAD
+ECDHE-RSA-AES256-SHA384 TLSv1.2 Kx=ECDH     Au=RSA Enc=AES(256) Mac=SHA384
+ECDHE-ECDSA-AES256-SHA384 TLSv1.2 Kx=ECDH     Au=ECDSA Enc=AES(256) Mac=SHA384
+ECDHE-RSA-AES256-SHA    SSLv3 Kx=ECDH     Au=RSA Enc=AES(256) Mac=SHA1
+...
+
+   The columns are: the cipher name, SSL protocol, key exchange used, authentication mechanism,
+encryption used, and MAC digest algorithm.
+   Ciphers can be specified for the CipherList directive according to the specification described in man
+ciphers.1. For example, as:
+
+Example
+
+AdvancedConfig = {"CipherList=ALL:!aNULL:!ADH:!eNULL:!LOW:!EXP:RC4+RSA:+HIGH:+MEDIUM"}
+
+
+   An analogous non-CMDaemon directive is found in LDAP client-server negotiation, where
+TLSCipherSuite can be set in the slapd.conf file, described in man slapd.conf.5.
+
+SSLServerMethod directive (with TLS masking)
+Syntax: AdvancedConfig = {"SSLServerMethod=TLS <versionnumber>", ...}
+Syntax: GlobalConfig = {"SSLServerMethod=TLS <versionnumber>", ...}
+Masking syntax: AdvancedConfig = {"TLS <versionnumber>=<boolean>", ...}
+Masking syntax: GlobalConfig = {"TLS <versionnumber>=<boolean>", ...}
+Default: GlobalConfig = { "TLS 1.2=1", "TLS 1.3=1", ... }
+
+The SSLServerMethod directive is a parameter of the AdvancedConfig (page 888) directive, as well as the
+GlobalConfig (page 889) directive. It sets the SSL server method for the OpenSSL suite that CMDaemon
+negotiates with clients. Possible values for <versionnumber> are:
+
+   • 1
+
+   • 1.1
+
+   • 1.2
+
+   • 1.3
+                                                                                                     897
+
+    By default, with no SSLServerMethod directive, TLS versions 1.2 and 1.3 are enabled.
+    This is because there are still some SSL clients that require a TLS 1.2 cipher and have no TLS 1.3
+cipher negotiation ability.
+    If the SSLServerMethod directive is specified, then only that TLS version is negotiated. For example,
+to allow only TLS 1.2 negotiation:
+
+Example
+
+GlobalConfig = { "SSLServerMethod=TLS 1.2", ... }
+
+   The SSLServerMethod directive is implied by the TLS masking syntax. The TLS masking syntax al-
+lows TLS negotiation methods to be set concurrently. For example, TLS 1 and TLS1.1 could be disabled,
+and TLS 1.2 and TLS 1.3 could be enabled, with:
+
+Example
+
+GlobalConfig = { "TLS 1=0", "TLS 1.1=0", "TLS 1.2=1", "TLS 1.3=1", ... }
+
+    The GlobalConfig value is the directive that the cluster administrator should set in most cases. It
+only needs to be set on cmd.conf on the head node (or head nodes in a high availability configuration),
+in order to configure the same TLS negotiation settings for the regular nodes.
+    The GlobalConfig value is overridden by the AdvancedConfig value. The AdvancedConfig value
+needs to be set on cmd.conf on the head node(s), but also needs to be set on the non-head nodes that
+are to be disabled. Setting the AdvancedConfig directive allows custom configuration of the TLS nego-
+tiations to be carried out per node, and if the negotiations do not match with the other end, then other
+settings are tried. This does mean that sometimes nodes with the extra settings end up running extra
+processes for no reason. Running the directive as an AdvancedConfig is therefore suboptimal for most
+reasonable use cases.
+    Reverting to the TLS 1.1 fallback cipher availability of earlier versions of CMDaemon is possible by
+setting:
+ AdvancedConfig = { "TLS 1.1=1", "TLS 1.2=1", "TLS 1.3=1" }
+Setting this brings with it the risk of allowing cryptographic downgrade attacks. It is therefore not
+recommended, and is also why it is disabled by default.
+
+
+JobInformationDisabled directive
+Syntax: AdvancedConfig = {"JobInformationDisabled=0|1", ...}
+Syntax: GlobalConfig = {"JobInformationDisabled=0|1", ...}
+Default: JobInformationDisabled=0
+
+The JobInformationDisabled directive is a parameter of the AdvancedConfig (page 888) directive, as
+well as the GlobalConfig (page 889) directive. If set to 1 it disables job-based monitoring (Chapter 11).
+The details of how this is done are discussed shortly.
+    For a cluster that is running millions of jobs at a time, job-based monitoring can typically consume
+significant resources. The monitoring of data for so many small jobs is typically not useful and not of
+interest. For such a case, setting this directive improves cluster performance by not having to deal with
+the information on the current jobs running on the cluster.
+    The GlobalConfig value is the directive that the cluster administrator should set in most cases. It
+only needs to be set on cmd.conf on the head node (or head nodes in a high availability configuration).
+Setting it disables the collection of job information by the nodes running the jobs, and no collection of
+the job information from those nodes is done by the head (monitoring) node.
+    The GlobalConfig value is overridden by the AdvancedConfig value. The AdvancedConfig value
+needs to be set on cmd.conf on the head node(s), but also needs to be set on the non-head nodes that
+898                                                           CMDaemon Configuration File Directives
+
+are to be disabled. Setting the AdvancedConfig directive still allows job information to be collected by
+the nodes running the jobs, but the information is not collected from the nodes by the head (monitoring)
+node. This means that nodes are running extra processes for probably no reason. Running the directive
+as an AdvancedConfig is therefore suboptimal for most use cases.
+
+
+JobInformationKeepDuration directive
+Syntax: AdvancedConfig = {"JobInformationKeepDuration=<number>", ...}
+Default: JobInformationKeepDuration=2419200
+
+The JobInformationKeepDuration directive is a parameter of the AdvancedConfig (page 888) directive.
+It takes on a value in seconds. If a job has finished more than that many seconds ago, then it will be
+removed along with all its monitoring data from the database. By default it is set to 28 days (24 ×
+3600 × 28 seconds).
+    If persistent is set to yes (cmsh:wlm > jobs), then job information is not removed even after
+JobInformationKeepDuration has been exceeded.
+
+JobInformationChargeBackKeepDuration directive
+Syntax: AdvancedConfig = {"JobInformationChargeBackKeepDuration=<number>", ...}
+Default: JobInformationChargeBackKeepDuration=158112000
+
+    The JobInformationChargeBackKeepDuration directive is a parameter of the AdvancedConfig
+(page 888) directive. It takes on a value in seconds. If a job has finished more than that many sec-
+onds ago, then it will be removed along with all its monitoring data from the database. By default it is
+set to a little more than 5 years (24 × 3600 × 366 × 5 seconds).
+
+
+JobInformationKeepCount directive
+Syntax: AdvancedConfig = {"JobInformationKeepCount=<number>", ...}
+Default: JobInformationKeepCount=8192
+
+The JobInformationKeepCount directive is a parameter of the AdvancedConfig (page 888) directive. If
+the total number of jobs is greater than (JobInformationKeepCount + 10%), then the job record and
+its data content are discarded, starting from the oldest job first, until the total number of jobs remain-
+ing becomes JobInformationKeepCount. If it is set to 0, then none of the job records and content are
+removed.
+    The maximum value for this directive is 1 million.
+
+
+JobInformationChargeBackKeepCount directive
+Syntax: AdvancedConfig = {"JobInformationChargeBackKeepCount=<number>", ...}
+Default: JobInformationChargeBackKeepCount=1048576
+
+The JobInformationChargeBackKeepCount directive is a parameter of the AdvancedConfig (page 888)
+directive. If the total number of jobs is greater than (JobInformationChargeBackKeepCount + 10%),
+then the job record and its data content are discarded, starting from the oldest job first, until the total
+number of jobs remaining becomes JobInformationChargeBackKeepCount. If it is set to 0, then none of
+the job records and content are removed.
+   The default value of about 1 million corresponds to about 0.5 GB of storage.
+   The maximum value for this directive is about 1 billion (1,073,741,824), which corresponds to about
+500 GB of storage.
+                                                                                                         899
+
+JobInformationMinimalJobDuration directive
+Syntax: AdvancedConfig = {"JobInformationMinimalJobDuration=<number>", ...}
+Default: JobInformationMinimalJobDuration=0
+
+The JobInformationMinimalJobDuration directive is a parameter of the AdvancedConfig (page 888)
+directive. If set, then jobs that run for less than this number of seconds are not stored in the cache. Its
+default value of 0 seconds means that all jobs are handled.
+
+
+JobInformationFlushInterval directive
+Syntax: AdvancedConfig = {"JobInformationFlushInterval=<number>", ...}
+Default: JobInformationFlushInterval=600
+
+The JobInformationFlushInterval directive is a parameter of the AdvancedConfig (page 888) direc-
+tive. If this interval, in seconds, is set, then the cache is flushed to the database with that interval. Its
+default value is 10 minutes (10 × 60 seconds). Values of around 30 seconds or less will conflict with the
+default CMDaemon maintenance timeout value of 30 seconds, and will mostly simply add load.
+
+
+JobInformationChargeBackRemoveInterval directive
+Syntax: AdvancedConfig = {"JobInformationChargeBackRemoveInterval=<number>", ...}
+Default: JobInformationChargeBackRemoveInterval=600
+
+The JobInformationChargeBackRemoveInterval directive is a parameter of the AdvancedConfig (page 888)
+directive. If this interval, in seconds, is set, then the cache is flushed to the database with that interval.
+Its default value is 10 minutes (10 × 60 seconds). Values of around 30 seconds or less will conflict with
+the default CMDaemon maintenance timeout value of 30 seconds, and will mostly simply add load.
+    The maximum remove interval is 1 day (86400 seconds).
+
+
+ActionLoggerFile directive
+Syntax: AdvancedConfig = {"ActionLoggerFile=filename", ...}
+Default: /var/spool/cmd/actions.log
+
+The directive is a parameter of the AdvancedConfig (page 888) directive. Its value overrides the default
+path.
+   The directive needs to be implemented per node or image.
+
+
+ActionLoggerOnSuccess directive
+Syntax: AdvancedConfig = {"ActionLoggerOnSuccess=0|1", ...}
+Default: ActionLoggerOnSuccess=0
+
+The directive is a parameter of the AdvancedConfig (page 888) directive.
+By default, only failed actions are logged.         Successful actions are also logged if setting
+ActionLoggerOnSuccess=1
+   The directive needs to be implemented per node or image.
+   The log file shows timestamped output with one line per run for an action script, with the script
+response.
+
+Example
+
+(time)   /path/to/action/script [ timeout ]
+900                                                            CMDaemon Configuration File Directives
+
+(time)    /path/to/action/script [ failed ] (exit code: 1)
+(time)    /path/to/action/script [ success ]
+
+      The success line only appears if ActionLoggerOnSuccess=1.
+
+
+FailoverPowerRetries directive
+Syntax: AdvancedConfig = {"FailoverPowerRetries=<number>", ...}
+Default: FailoverPowerRetries=5
+
+The FailoverPowerRetries directive is a parameter of the AdvancedConfig (page 888) directive.
+    After a decision to carry out the failover has been made, CMDaemon sends a power off command
+to the BMC of the head node that is meant to be powered off. If the power off command fails, then on
+getting the fail response, CMDaemon waits for 1 second. After that second, it sends out a power off
+command again. The value of FailoverPowerRetries is the number of times that CMDaemon retries
+sending the power off command to the BMC of the head node that is intended to be powered off during
+the failover, if the response from the power off command remains a fail response.
+    The power down attempts cease, either when the BMC reports that the head node is OFF, or when
+the number of attempts reaches the FailoverPowerRetries value.
+    FailoverPowerRetries takes a maximum value of 120.
+    A value of 0 means that 1 attempt to power off is carried out during failover, but no retry is attempted
+after the first attempt.
+    Because CMDaemon waits for a period of 1s before checking for an OFF reponse, it means that the
+number of retries is about the same as the number of seconds before CMDaemon decides that powering
+off has failed, unless the OFF response also takes some time to get to CMDaemon.
+    Increasing the value for this directive can be useful for some BMC cards that take longer than about
+5s to report their power status, because the power off attempt may otherwise time out.
+
+
+AddUserDefaultGroupID directive
+Syntax: AdvancedConfig = { "AddUserDefaultGroupID = <number>", ...}
+Default: none
+
+The AddUserDefaultGroupID directive is a parameter of the AdvancedConfig (page 888) directive.
+    If the AddUserDefaultGroupID is unset, then the default group ID of a new user is the same as the
+User ID.
+    If the AddUserDefaultGroupID is set, then the set value becomes the default GUID of new users,
+when new users are created via the cmsh or Base View front ends to CMDaemon.
+    The directive is not intended to set a non-default group occasionally during user creation. In that
+case, a non-default group ID can be set from the cmsh or Base View front ends, by setting the groupid
+value for the user.
+    To set a default group for a directory, while retaining the default group for the user, it may be possible
+to use the setgid bit for a directory.
+
+
+MaxMeasurablesPerProducer directive
+Syntax: AdvancedConfig = { "MaxMeasurablesPerProducer = <number>", ...}
+Default: 500
+
+The MaxMeasurablesPerProducer directive is a parameter of the AdvancedConfig (page 888) directive.
+   By default there is a software limit of 500 measurables per data producer. If this limit is exceded,
+then the CMDaemon monitoring info logs show complaints about “too many measurables”.
+                                                                                                     901
+
+   In that case, if the cluster hardware is not too slow, and if the measurables produced are not some
+kind of hardware garbage data values, then increasing the value of this directive should allow more
+measurables to be dealt with.
+
+
+HeadNodeCertificateNameAlternatives directive
+Syntax: AdvancedConfig = {"HeadNodeCertificateNameAlternatives=<name,. . . >", ...}
+Default: none
+
+The HeadNodeCertificateNameAlternatives directive is a key of the AdvancedConfig (page 888) direc-
+tive. It takes on a comma-separated list of alternative DNS names as values to add to the SSL certificate
+that it generates for CMDaemon.
+    The old certificates must be removed before the new ones are used.
+
+Example
+
+[root@basecm11 ~]# cm-manipulate-advanced-config.py HeadNodeCertificateNameAlternatives=myname1,myname2
+[root@basecm11 ~]# openssl x509 -in /cm/local/apps/cmd/etc/cert.pem -noout -text | grep -o DNS:myname1.*$
+[root@basecm11 ~]# rm /cm/local/apps/cmd/etc/cert.pem,key
+[root@basecm11 ~]# systemctl restart cmd    #new certificates auto-generated
+[root@basecm11 ~]# openssl x509 -in /cm/local/apps/cmd/etc/cert.pem -noout -text | grep -o DNS:myname1.*$
+DNS:myname1, DNS:myname1:8081, DNS:myname2, DNS:myname2:8081

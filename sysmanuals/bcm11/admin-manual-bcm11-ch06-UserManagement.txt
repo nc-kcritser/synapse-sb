@@ -1,0 +1,1108 @@
+                                                                                            6
+                                               Chapter 6 - User Management
+Users and groups for the cluster are presented to the administrator in a single system paradigm. That
+is, if the administrator manages them with BCM, then the changes are automatically shared across the
+cluster (the single system).
+     BCM runs its own LDAP service to manage users, rather than using unix user and group files. In
+other words, users and groups are managed via the centralizing LDAP database server running on the
+head node, and not via entries in /etc/passwd or /etc/group files.
+     Sections 6.1 and 6.2 cover the most basic aspects of how to add, remove and edit users and groups
+using BCM.
+     Section 6.3 describes how an external LDAP server can be used for authentication services instead of
+the one provided by BCM.
+     Section 6.4 discusses how users can be assigned only selected capabilities when using Base View or
+cmsh, using profiles with sets of tokens.
+
+6.1   Managing Users And Groups With Base View
+Within Base View:
+
+   • users can be managed via the navigation path Identity Management > Users
+
+   • groups can be managed via the navigation path Identity Management > Groups.
+
+For users (figure 6.1) the LDAP entries for users are displayed. These entries are editable and each user
+can then be managed in further detail.
+    There is already one user on a newly-installed BCM: cmsupport. This user has no password set by
+default, which means (section 6.2.2) no logins to this account are allowed by default. BCM uses the user
+cmsupport to run various diagnostics utilities, so it should not be removed, and the default contents of
+its home directory should not be removed.
+314                                                                                 User Management
+
+
+
+
+                                Figure 6.1: Base View User Management
+
+   The + Add button allows users to be added via a subwindow (figure 6.2). Parameter values can be
+committed for the users via the Commit User button in the subwindow.
+
+
+
+
+                          Figure 6.2: Base View User Management: Add Dialog
+
+      When saving an addition or modification:
+
+   • User and group ID numbers are automatically assigned from UID and GID 1000 onward.
+
+   • A home directory is created and a login shell is set. Users with unset passwords cannot log in.
+
+    Group management in Base View is carried out via the navigation path Identity Management >
+Groups. Clickable LDAP object entries for regular groups then show up, similar to the user entries
+already covered. Management of these entries is done with the same functions as for user management.
+6.2 Managing Users And Groups With cmsh                                                                  315
+
+6.2   Managing Users And Groups With cmsh
+User management tasks as carried out by Base View in section 6.1, can be carried with the same end
+results in cmsh too.
+   A cmsh session is run here in order to cover the functions corresponding to the user management
+functions of Base View of section 6.1. These functions are run from within the user mode of cmsh:
+
+Example
+
+[root@basecm11 ~]# cmsh
+[basecm11]% user
+[basecm11->user]%
+
+6.2.1 Adding A User
+This part of the session corresponds to the functionality of the Add button operation in section 6.1. In user
+mode, the process of adding a user maureen to the LDAP directory is started with the add command:
+
+Example
+
+[basecm11->user]% add maureen
+[basecm11->user*[maureen*]]%
+
+    The cmsh utility helpfully drops into the user object just added, and the prompt shows the user name
+to reflect this. Going into user object would otherwise be done manually by typing use maureen at the
+user mode level.
+    Asterisks in the prompt are a helpful reminder of a modified state, with each asterisk indicating that
+there is an unsaved, modified property at that asterisk’s level.
+    The modified command displays a list of modified objects that have not yet been committed:
+
+Example
+
+[basecm11->user*[maureen*]]% modified
+State Type                     Name
+------ ----------------------- ---------------
++      User                    maureen
+
+   Running show at this point reveals a user name entry, but empty fields for the other properties of
+user maureen. So the account in preparation, while it is modified, is clearly not yet ready for use:
+
+Example
+
+[basecm11->user*[maureen*]]% show
+Parameter                           Value
+----------------------------------- ------------------------------------------------
+Accounts
+Managees
+Name                                maureen
+Primary group
+Revision
+Secondary groups
+ID
+Common name
+Surname
+Group ID
+Login shell
+Password                            < not set >
+Home directory
+316                                                                                User Management
+
+Home directory operation              yes
+Email
+Profile
+Write ssh proxy config                no
+Create ssh key                        no
+Disable password ssh                  no
+Allow GPU workload power profiles     no
+Authorized ssh keys                   <0B>
+Shadow min                            0
+Shadow max                            999999
+Shadow warning                        7
+Shadow inactive                       0
+Last change                           1970/1/1
+Expiration date                       2038/1/1
+Project manager                       <submode>
+Notes                                 <0B>
+
+6.2.2 Saving The Modified State
+This part of the session corresponds to the functionality of the SAVE button operation in section 6.1.
+   In section 6.2.1 above, user maureen was added. maureen now exists as a proposed modification, but
+has not yet been committed to the LDAP database.
+   Running the commit command now at the maureen prompt stores the modified state at the user
+maureen object level:
+Example
+
+[basecm11->user*[maureen*]]% commit
+[basecm11->user[maureen]]% show
+Parameter                           Value
+----------------------------------- ------------------------------------------------
+Accounts
+Managees
+Name                                maureen
+Primary group                       1001
+Revision
+Secondary groups
+ID                                  1001
+Common name                         maureen
+Surname                             maureen
+Group ID                            1001
+Login shell                         /bin/bash
+Password                            ********
+Home directory                      /home/maureen
+Home directory operation            yes
+Email
+Profile
+Write ssh proxy config              no
+Create ssh key                      no
+Disable password ssh                no
+Allow GPU workload power profiles no
+Authorized ssh keys                 <0B>
+Shadow min                          0
+Shadow max                          999999
+Shadow warning                      7
+Shadow inactive                     0
+Last change                         2025/5/20
+6.2 Managing Users And Groups With cmsh                                                                  317
+
+Expiration date                         2038/1/1
+Project manager                         <submode>
+Notes                                   <0B>
+
+If, however, commit were to be run at the user mode level without dropping into the maureen object
+level, then instead of just that modified user, all modified users would be committed.
+    When the commit is done, all the empty fields for the user are automatically filled in with defaults
+based the underlying Linux distribution used. Also, as a security precaution, if an empty field (that is, a
+“not set”) password entry is committed, then a login to the account is not allowed. So, in the example,
+the account for user maureen exists at this stage, but still cannot be logged into until the password is set.
+Editing passwords and other properties is covered in section 6.2.3.
+    The default permissions for file and directories under the home directory of the user are defined by
+the umask settings in /etc/login.defs, as would be expected if the administrator were to use the stan-
+dard useradd command. Setting a path for the homedirectory parameter for a user sets a default home
+directory path. By default the default path is /home/<username> for a user <username>. If homedirectory
+is unset, then the default is determined by the HomeRoot directive (Appendix C).
+
+6.2.3 Editing Properties Of Users And Groups
+This corresponds roughly to the functionality of the Edit operation in section 6.1.
+    In the preceding section 6.2.2, a user account maureen was made, with an unset password as one of
+its properties. Logins to accounts with an unset password are refused. The password therefore needs to
+be set if the account is to function.
+
+Editing Users With set And clear
+The tool used to set user and group properties is the set command. Typing set and then either using
+tab to see the possible completions, or following it up with the enter key, suggests several parameters
+that can be set, one of which is password:
+
+Example
+
+[basecm11->user[maureen]]% set
+Name:
+          set - Set specific user property
+
+Usage:
+           set [OPTIONS] [user] <parameter> <value> [<value> ...]
+
+Options:
+           -e, --extra
+                Set an extra free key/value parameter
+
+           -v, --vector
+                Set extra parameter values as a vector even for a single value
+
+           -t, --type <type>
+                Convert extra parameter values, type: [i]nt, [u]unsigned, f[float], d[double]
+
+Arguments:
+          user                   name of the user, omit if current is set
+
+Parameters:
+          name ................ User login (e.g. donald)
+          id .................. User ID number
+          commonname .......... Full name (e.g. Donald Duck)
+          surname ............. Surname (e.g. Duck)
+318                                                                                          User Management
+
+          groupid ............. Base group of this user
+          loginshell .......... Login shell
+          homedirectory ....... Home directory
+          password ............ Password
+          homedirectoryoperation Set to false to not create or move home directory
+          shadowmin ........... Minimum number of days required between password changes
+          shadowmax ........... Maximum number of days for which the user password remains valid.
+          shadowwarning ....... Number of days of advance warning given to the user before the user
+                                password expires
+          shadowinactive ...... Number of days of inactivity allowed for the user
+          expirationdate ...... Date on which the user login will be disabled
+          email ............... Email
+          profile ............. Profile for Authorization
+          projectmanager ...... Project manager
+          notes ............... Administrator notes
+          writesshproxyconfig . Write ssh proxy config
+          createsshkey ........ Create ssh key for added users
+          disablepasswordssh .. Disable password ssh
+          authorizedsshkeys ... Authorized ssh keys
+          allowgpuworkloadpowerprofiles Allow changing GPU workload power profiles from jobs
+          revision ............ Entity revision
+[basecm11->user[maureen]]%
+
+   Continuing the session from the end of section 6.2.2, the password can be set at the user context
+prompt like this:
+
+Example
+
+[basecm11->user[maureen]]% set password seteca5tr0n0my
+[basecm11->user*[maureen*]]% commit
+[basecm11->user[maureen]]%
+
+At this point, the account maureen is finally ready for use.
+   The converse of the set command is the clear command, which clears properties:
+
+Example
+
+[basecm11->user[maureen]]% clear password; commit
+
+Setting A Password With The LDAP Hash
+Setting a password in cmsh is also possible by setting the LDAP hash (the encrypted storage format) that
+is generated from the password within cmsh. When setting passwords in cmsh, a string starting with
+{MD5}, {CRYPT} or {SSHA} is considered to be the hash of the password:
+
+Example
+
+[root@basecm11 ~]# #first create the LDAP salted SHA-1 hash of the password:
+[root@basecm11 ~]# /cm/local/apps/openldap/sbin/slappasswd -h {SSHA} -s seteca5tr0n0my
+[root@basecm11 ~]# {SSHA}sViD+lfSTtlIy0MuGwPGfGd5XKHgEm5d
+[root@basecm11 ~]# cmsh
+[basecm11]% user use maureen
+[basecm11->user[maureen]]% set password
+enter new password:             #here and in the next line {SSHA}sViD+lfSTtlIy0MuGwPGfGd5XKHgEm5d is typed in
+retype new password:
+[basecm11->user[maureen]]% commit
+[basecm11->user[maureen]]% !ssh maureen@node001                #now will test the password that generated the hash
+Warning: Permanently added 'node001' (ECDSA) to the list of known hosts.
+6.2 Managing Users And Groups With cmsh                                                                319
+
+maureen@node001's password:     #here seteca5tr0n0my is typed in
+Creating ECDSA key for ssh
+[maureen@node001 ~]$            #successfully logged in with the password associated with the hash
+
+   Managing passwords in cmsh via direct LDAP hash entry is not normally done.
+
+Forcing The User To Change A Set Password On Login
+The AdvancedConfig AddUserPasswordReset (page 893) can be used to force a user password change.
+This can be for new users on first login, or for existing users.
+
+Editing Groups With append And removefrom
+While the preceding commands set and clear also work with groups, there are two other commands
+available which suit the special nature of groups. These supplementary commands are append and
+removefrom. They are used to add extra users to, and remove extra users from a group.
+   For example, it may be useful to have a printer group so that several users can share access to a
+printer. For the sake of this example (continuing the session from where it was left off in the preceding),
+tim and fred are now added to the LDAP directory, along with a group printer:
+Example
+[basecm11->user[maureen]]% add tim; add fred
+[basecm11->user*[fred*]]% exit; group; add printer
+[basecm11->group*[printer*]]% commit
+[basecm11->group[printer]]% exit; exit; user
+[basecm11->user*]%
+
+The context switch that takes place in the preceding session should be noted: The context of user
+maureen was eventually replaced by the context of group printer. As a result, the group printer is
+committed, but the users tim and fred are not yet committed, which is indicated by the asterisk at the
+user mode level.
+   Continuing onward, to add users to a group the append command is used. A list of users maureen,
+tim and fred can be added to the group printer like this:
+Example
+[basecm11->user*]% commit
+Successfully committed 2 Users
+[basecm11->user]% group use printer
+[basecm11->group[printer]]% append members maureen tim fred; commit
+[basecm11->group[printer]]% show
+Parameter                 Value
+------------------------ --------------------------
+ID                        1002
+Revision
+Name                      printer
+Members                   maureen,tim,fred
+
+   To remove users from a group, the removefrom command is used. A list of specific users, for example,
+tim and fred, can be removed from a group like this:
+[basecm11->group[printer]]% removefrom members tim fred; commit
+[basecm11->group[printer]]% show
+Parameter                Value
+------------------------ --------------------------
+ID                       1002
+Revision
+Name                     printer
+Members                  maureen
+320                                                                                      User Management
+
+   The clear command can also be used to clear members—but it also clears all of the extras from the
+group:
+
+Example
+
+[basecm11->group[printer]]% clear members
+[basecm11->group*[printer*]]% show
+Parameter                Value
+------------------------ --------------------------
+ID                       1002
+Revision
+Name                     printer
+Members
+
+The commit command is intentionally left out at this point in the session in order to illustrate how
+reversion is used in the next section.
+
+6.2.4 Reverting To The Unmodified State
+This corresponds roughly to the functionality of the Revert operation in section 6.1.
+    This section (6.2.4) continues on from the state of the session at the end of section 6.2.3. There, the
+state of group printers was cleared so that the extra added members were removed. This state (the
+state with no group members showing) was however not yet committed.
+    The refresh command (page 59) reverts an uncommitted object back to the last committed state.
+    This happens at the level of the object it is using. For example, the object that is being handled here is
+the properties of the group object printer. Running revert at a higher level prompt—say, in the group
+mode level—would revert everything at that level and below. So, in order to affect only the properties
+of the group object printer, the refresh command is used at the group object printer level prompt.
+It then reverts the properties of group object printer back to their last committed state, and does not
+affect other objects:
+
+Example
+
+[basecm11->group*[printer*]]% refresh
+[basecm11->group[printer]]% show
+Parameter                Value
+------------------------ --------------------------
+ID                       1002
+Revision
+Name                     printer
+Members                  maureen
+
+   Here, the user maureen reappears because she was stored in the last save. Also, because only the
+group object printer has been committed, the asterisk indicates the existence of other uncommitted,
+modified objects.
+
+6.2.5 Removing A User
+Removing a user using cmsh corresponds roughly to the functionality of the Delete operation in sec-
+tion 6.1.
+    The remove command removes a user or group. The useful “-d|--data” flag added to the end of
+the username removes the user’s home directory too. For example, within user mode, the command
+“remove user maureen -d; commit” removes user maureen, along with her home directory. Continu-
+ing the session at the end of section 6.2.4 from where it was left off, as follows, shows this result:
+
+Example
+6.3 Using An External LDAP Server                                                                    321
+
+[basecm11->group[printer]]% user use maureen
+[basecm11->user[maureen]]% remove -d; commit
+Successfully removed 1 Users
+Successfully committed 0 Users
+[basecm11->user]% !ls -d /home/*| grep maureen       #no maureen left behind
+[basecm11->user]%
+
+
+6.3   Using An External LDAP Server
+Sometimes, an external LDAP server is used to serve the user database. If, instead of just using the
+database for authentication, the user database is also to be managed, then its LDAP schema must match
+the BCM LDAP schema.
+   For RHEL8, the /etc/nslcd.conf, /etc/openldap/ldap.conf, and the certificate files under /cm/
+local/apps/openldap/etc/certs/ should be copied over. For RHEL9, /etc/sssd/sssd.conf is copied
+over instead of /etc/nslcd.conf.
+   Port 636 on ShoreWall running on the head node should be open for LDAP communication over the
+external network, if external nodes are using it on the external network. In addition, the external nodes
+and the head node must be able to resolve each other.
+   By default, BCM runs an LDAP health check using the cmsupport user on the LDAP server. The
+LDAP health check may need to be modified or disabled by the administrator to prevent spurious health
+warnings with an external LDAP server:
+
+Modifying Or Disabling The ldap Healthcheck
+Modifying the ldap health check: To keep a functional ldap health check with an external LDAP
+server, a permanent external LDAP user name, for example ldapcheck, can be added. This user can
+then be set as the parameter for BCM’s ldap health check object that is used to monitor the LDAP
+service. Health checks and health check objects are discussed in Chapter 10.
+   • If user management is not configured to work on CMDaemon for the external LDAP server, then
+     the user management tool that is used with the external LDAP server should be used by the ad-
+     ministrator to create the ldapcheck user instead.
+
+   • If user management is still being done via CMDaemon, then an example session for configuring
+     the ldap script object to work with the new external LDAP user is (some prompt text elided):
+
+      Example
+
+      [root@basecm11 ~]# cmsh
+      [basecm11]% user
+      [basecm11->user]% add ldapcheck; commit
+      [basecm11->user[ldapcheck]]% monitoring setup use ldap
+      [basecm11->monitoring->setup[ldap]]% show
+      Parameter                        Value
+      -------------------------------- -----------------------------------------
+      ...
+      Arguments
+      ...
+      [basecm11->monitoring->setup[ldap]]% set arguments "ldapcheck"; commit
+      [basecm11->monitoring->setup[ldap:ldapcheck]]%
+
+Disabling the ldap health check: Instead of modifying the ldap health check to work when using an
+external LDAP server, it can be disabled entirely via Base View or cmsh.
+
+   • Base View: the ldap health check is disabled via the navigation path:
+322                                                                                  User Management
+
+      Monitoring > Data Producers > ldap > Edit
+
+
+   • cmsh: the disabled parameter of the ldap health check object is set to yes. The disabled parameter
+     for the ldap health check can be set as follows:
+
+      [root@basecm11 ~]# cmsh -c "monitoring setup use ldap; set disabled yes; commit"
+
+Configuring The Cluster To Authenticate Against An External LDAP Server
+The cluster can be configured in different ways to authenticate against an external LDAP server.
+   For smaller clusters, a configuration where LDAP clients on all nodes point directly to the external
+server is recommended. An easy way to set this up is as follows:
+
+   • On the head node:
+
+        – In distributions that are derived from the RHEL 8.x series: The files in which the changes need
+          to be made are /etc/nslcd.conf and /etc/openldap/ldap.conf. To implement the changes,
+          the nslcd daemon must then be restarted, for example with systemctl nslcd restart.
+          For the RHEL 9.x series, /etc/nslcd.conf is replaced by /etc/sssd/sssd.conf, and it is the
+          sssd daemon that must be restarted, for example with: /bin/systemctl restart sssd.
+        – the updateprovisioners command (section 5.2.4) is run to update any other provisioners.
+
+   • Then, the configuration files are updated in the software images that the nodes use. If the nodes
+     use the default-image, and if the nodes are based on RHEL8 and derivatives, then the files to up-
+     date are /cm/images/default-image/etc/nslcd.conf and /cm/images/default/etc/openldap/
+     ldap.conf.
+      For RHEL9 and derivatives /cm/images/default-image/etc/sssd/sssd.conf is used instead
+      /cm/images/default-image/etc/nslcd.conf.
+      After the configuration change has been made, and the nodes have picked up the new configura-
+      tion, the regular nodes can then carry out LDAP lookups.
+
+        – Nodes can simply be rebooted to pick up the updated configuration, along with the new
+          software image.
+        – Alternatively, to avoid a reboot, the imageupdate command (section 5.6.2) can be run to pick
+          up the new software image from a provisioner.
+
+   • The CMDaemon configuration file cmd.conf (Appendix C) has LDAP user management direc-
+     tives. These may need to be adjusted:
+
+        – If another LDAP tool is to be used for external LDAP user management instead of Base View
+          or cmsh, then altering cmd.conf is not required, and BCM’s user management capabilities do
+          nothing in any case.
+        – If, however, system users and groups are to be managed via Base View or cmsh, then CMDae-
+          mon, too, must refer to the external LDAP server instead of the default LDAP server. This
+          configuration change is actually rare, because the external LDAP database schema is usually
+          an existing schema generated outside of BCM, and so it is very unlikely to match BCM LDAP
+          database schema. To implement the changes:
+            * On the node that is to manage the database, which is normally the head node, the
+              LDAPHost, LDAPUser, LDAPPass, and LDAPSearchDN directives in cmd.conf are changed
+              so that they refer to the external LDAP server.
+            * CMDaemon is restarted to enable the new configurations.
+6.3 Using An External LDAP Server                                                                       323
+
+For larger clusters the preceding solution can cause issues due to traffic, latency, security and connec-
+tivity fault tolerance. If such occur, a better solution is to replicate the external LDAP server onto the
+head node, hence keeping all cluster authentication local, and making the presence of the external LDAP
+server unnecessary except for updates. This optimization is described in the next section.
+
+6.3.1 External LDAP Server Replication
+This section explains how to set up replication for an external LDAP server to an LDAP server that is
+local to the cluster, if improved LDAP services are needed. Section 6.3.2 then explains how this can then
+be made to work with a high availability setup.
+    Typically, the BCM LDAP server is configured as a replica (consumer) to the external LDAP server
+(provider), with the consumer refreshing its local database at set timed intervals. How the configuration
+is done varies according to the LDAP server used. The description in this section assumes the provider
+and consumer both use OpenLDAP.
+
+External LDAP Server Replication: Configuring The Provider
+It is advisable to back up any configuration files before editing them.
+     The provider is assumed to be an external LDAP server, and not necessarily part of the BCM cluster.
+The LDAP TCP ports 389 and 689 may therefore need to be made accessible between the consumer and
+the provider by changing firewall settings.
+If a provider LDAP server is already configured then the following synchronization directives must be
+in the slapd.conf file to allow replication:
+index entryCSN eq
+index entryUUID eq
+overlay syncprov
+syncprov-checkpoint <ops> <minutes>
+syncprov-sessionlog <size>
+
+The openldap documentation (http://www.openldap.org/doc/) has more on the meanings of these
+directives. If the values for <ops>, <minutes>, and <size> are not already set, typical values are:
+
+syncprov-checkpoint 1000 60
+
+and:
+
+syncprov-sessionlog 100
+
+    To allow the consumer to read the provider database, the consumer’s access rights need to be config-
+ured. In particular, the userPassword attribute must be accessible. LDAP servers are often configured
+to prevent unauthorized users reading the userPassword attribute.
+    Read access to all attributes is available to users with replication privileges. So one way to allow the
+consumer to read the provider database is to bind it to replication requests.
+    Sometimes a user for replication requests already exists on the provider, or the root account is used
+for consumer access. If not, a user for replication access must be configured.
+    A replication user, syncuser with password secret can be added to the provider LDAP with ade-
+quate rights using the following syncuser.ldif file:
+
+dn: cn=syncuser,<suffix>
+objectClass: person
+cn: syncuser
+sn: syncuser
+userPassword: secret
+
+Here, <suffix> is the suffix set in slapd.conf, which is originally something like dc=example,dc=com.
+The syncuser is added using:
+324                                                                                  User Management
+
+ldapadd -x -D "cn=root,<suffix>" -W -f syncuser.ldif
+
+This prompts for the root password configured in slapd.conf.
+   To verify syncuser is in the LDAP database the output of ldapsearch can be checked:
+ldapsearch -x "(sn=syncuser)"
+
+   To allow access to the userPassword attribute for syncuser the following lines in slapd.conf are
+changed, from:
+
+ access to attrs=userPassword
+   by self write
+   by anonymous auth
+   by * none
+
+to:
+ access to attrs=userPassword
+   by self write
+   by dn="cn=syncuser,<suffix>" read
+   by anonymous auth
+   by * none
+
+Provider configuration is now complete. The server can be restarted using
+      systemctl restart slapd.service
+      in RHEL8.x and RHEL9.x.
+
+External LDAP Server Replication: Configuring The Consumer(s)
+The consumer is an LDAP server on a BCM head node. It is configured to replicate with the provider
+by adding the following lines to /cm/local/apps/openldap/etc/slapd.conf:
+syncrepl rid=2
+   provider=ldap://external.ldap.server
+   type=refreshOnly
+   interval=01:00:00:00
+   searchbase=<suffix>
+   scope=sub
+   schemachecking=off
+   binddn="cn=syncuser,<suffix>"
+   bindmethod=simple
+   credentials=secret
+
+Here:
+
+      • The rid=2 value is chosen to avoid conflict with the rid=1 setting used during high availability
+        configuration (section 6.3.2).
+
+      • The provider argument points to the external LDAP server.
+
+      • The interval argument (format DD:HH:MM:SS) specifies the time interval before the consumer
+        refreshes the database from the external LDAP. Here, the database is updated once a day.
+
+      • The credentials argument specifies the password chosen for the syncuser on the external LDAP
+        server.
+
+   More on the syncrepl directive can be found in the openldap documentation (http://www.openldap.
+org/doc/).
+   The configuration files must also be edited so that:
+6.3 Using An External LDAP Server                                                                       325
+
+   • The <suffix> and rootdn settings in slapd.conf both use the correct <suffix> value, as used by the
+     provider.
+
+   • The base value in /etc/ldap.conf uses the correct <suffix> value as used by the provider. This is
+     set on all BCM nodes including the head node(s). If the /etc/ldap.conf file does not exist, then
+     the note on page 322 applies.
+
+   Finally, before replication takes place, the consumer database is cleared. This can be done by re-
+moving all files, except for the DB_CONFIG file, from under the configured database directory, which by
+default is at /var/lib/ldap/.
+   The consumer is restarted using systemctl restart slapd. This replicates the provider’s LDAP
+database, and continues to do so at the specified intervals.
+
+6.3.2   High Availability
+No External LDAP Server Case
+If the LDAP server is not external—that is, if BCM is set to its high availability configuration, with its
+LDAP servers running internally, on its own head nodes—then by default LDAP services are provided
+from both the active and the passive node. The high-availability setting ensures that CMDaemon takes
+care of any changes needed in the slapd.conf file when a head node changes state from passive to
+active or vice versa, and also ensures that the active head node propagates its LDAP database changes
+to the passive node via a syncprov/syncrepl configuration in slapd.conf.
+
+External LDAP Server With No Replication Locally Case
+In the case of an external LDAP server being used, but with no local replication involved, no special
+high-availability configuration is required. The LDAP client configuration in /etc/ldap.conf simply
+remains the same for both active and passive head nodes, pointing to the external LDAP server. The
+file /cm/images/default-image/etc/ldap.conf, in each software image also point to the same external
+LDAP server. If the /etc/ldap.conf files referred to here in the head and software images do not exist,
+then the note on page 322 applies.
+
+External LDAP Server With Replication Locally Case
+In the case of an external LDAP server being used, with the external LDAP provider being replicated to
+the high-availability cluster, it is generally more efficient for the passive node to have its LDAP database
+propagated and updated only from the active node to the passive node, and not updated from the
+external LDAP server.
+    The configuration should therefore be:
+
+   • an active head node that updates its consumer LDAP database from the external provider LDAP
+     server
+
+   • a passive head node that updates its LDAP database from the active head node’s LDAP database
+
+   Although the final configuration is the same, the sequence in which LDAP replication configuration
+and high availability configuration are done has implications on what configuration files need to be
+adjusted.
+
+  1. For LDAP replication configuration done after high availability configuration, adjusting the new
+     suffix in /cm/local/apps/openldap/etc/slapd.conf and in /etc/ldap.conf on the passive node
+     to the local cluster suffix suffices as a configuration. If the ldap.conf file does not exist, then the
+     note on page 322 applies.
+
+  2. For high availability configuration done after LDAP replication configuration, the initial LDAP
+     configurations and database are propagated to the passive node. To set replication to the passive
+     node from the active node, and not to the passive node from an external server, the provider option
+326                                                                                      User Management
+
+      in the syncrepl directive on the passive node must be changed to point to the active node, and the
+      suffix in /cm/local/apps/openldap/etc/slapd.conf on the passive node must be set identical to
+      the head node.
+
+   The high availability replication event occurs once only for configuration and database files in BCM’s
+high availability system. Configuration changes made on the passive node after the event are therefore
+persistent.
+
+
+6.4    Tokens And Profiles
+Access to Base View and cmsh is based on user certificates (section 2.3.3).
+    Tokens can be assigned by the administrator to users so that users can carry out some of the operations
+that the administrator does with Base View or cmsh. Every cluster management operation requires that
+each user, including the administrator, has the relevant tokens in their profile for the operation.
+    The tokens for a user are grouped into a profile, and such a profile is typically given a name
+by the administrator according to the assigned capabilities. For example the profile might be called
+readmonitoringonly if it allows the user to read the monitoring data only, or it may be called
+powerhandler if the user is only allowed to carry out power operations. Each profile thus consists
+of a set of tokens, typically relevant to the name of the profile, and is typically assigned to several users.
+    The profile is stored as part of the authentication certificate (section 2.3) which is generated for run-
+ning authentication operations to the cluster manager for the certificate owner.
+    Profiles are handled with the profiles mode of cmsh, or from the Base View Profiles window,
+accessible via a navigation path of Identity Management > Profiles
+    The following preconfigured profiles are available from cmsh:
+
+      Profile name                         Default Tasks Allowed                                 nonuser ?
+      admin                                all tasks                                             no
+      autonomous-hardware-recovery         autonomous hardware recovery tasks                    yes
+      autonomous-job-recovery              autonomous job recovery tasks                         yes
+      bootstrap                            bootstrap tasks                                       yes
+      cmhealth                             health-related prejob tasks                           yes
+      cmpam                                BCM PAM tasks                                         yes
+      litenode                             CMDaemon Lite (section 2.6.7) tasks                   yes
+      monitoringpush                       pushing raw monitoring data to CMDaemon via           yes
+                                           a JSON POST (page 69 of the Developer Manual)
+      mqtt                                 MQTT tasks                                            yes
+      node                                 node-related tasks, for example by the node-          yes
+                                           installer
+      portal                               user portal viewing                                   no
+      power                                device power                                          yes
+      prs                                  PRS tasks                                             yes
+      readonly                             view-only                                             no
+
+   The last column in the preceding table indicates whether the preconfigured profile is a nonuser
+profile or not. A cmsh one-liner that indicates this is:
+[root@basecm11 ~]# cmsh -c "profile; foreach * (get name; get nonuser)" | paste - -
+
+   • Most of the preconfigured profiles are nonuser profiles. Such a profile is used by cluster manager
+     clients, and should never be modified by the cluster administrator.
+6.4 Tokens And Profiles                                                                                327
+
+   • The preconfigured profiles that are not nonuser profiles are admin, readonly, and portal. These
+     can be modified by the cluster administrator and used for human users.
+
+   The cluster manager services that use the available preconfigured profiles can be viewed in cmsh the
+list command in profile mode.
+   The tokens, and other properties of a particular profile can be seen within profile mode as follows:
+
+Example
+
+[basecm11->profile]% show readonly
+Parameter    Value
+------------ ----------------------------------------------------------------------------------
+Name         readonly
+Non user     no
+Revision
+Services     CMDevice CMNet CMPart CMMon CMJob CMAuth CMServ CMUser CMSession CMMain CMGui CMP+
+Tokens       GET_DEVICE_TOKEN GET_CATEGORY_TOKEN GET_NODEGROUP_TOKEN POWER_STATUS_TOKEN GET_DE+
+
+   For screens that are not wide enough to view the parameter values, the values can also be listed:
+
+Example
+
+[basecm11->profile]% get readonly tokens
+GET_DEVICE_TOKEN
+GET_CATEGORY_TOKEN
+GET_NODEGROUP_TOKEN
+...
+
+   A profile can be set with cmsh for a user within user mode as follows:
+
+Example
+
+[root@basecm11 ~]# cmsh
+[basecm11]% user use conner
+[basecm11->user[conner]]% get profile
+
+[basecm11->user[conner]]% set profile readonly; commit
+
+Only a subset of the predefined profiles are available to users. The ones that are made available to users
+are readonly, admin, and portal.
+
+6.4.1 Modifying Profiles
+A profile can be modified by adding or removing appropriate tokens to it. For example, the readonly
+group by default has access to the burn status and burn log results. Removing the appropriate tokens
+stops users in that group from seeing these results.
+   In cmsh the removal can be done from within profile mode as follows:
+
+[root@basecm11 ~]# cmsh
+[basecm11]% profile use readonly
+[...[readonly]]% removefrom tokens burn_status_token get_burn_log_token
+[basecm11]%->profile*[readonly*]]% commit
+
+   Tab-completion after typing in removefrom tokens helps in filling in the tokens that can be removed.
+   In Base View (figure 6.3), the same removal action can be carried out via the navigation path:
+Identity Management > Profiles > Filters > readonly >
+328                                                                                     User Management
+
+    In the resulting display it is convenient to maximize the window. Also convenient is running a search
+for burn, which will show the relevant tokens:
+    BURN_STATUS_TOKEN and GET_BURN_LOG_TOKEN
+    as well as the subgroup they are in, which is the CMDevice subgroup.
+    The checkmarks can be removed from the BURN_STATUS_TOKEN and GET_BURN_LOG_TOKEN tags, and
+the changed profile can then be committed.
+
+
+
+
+                            Figure 6.3: Base View Profile Token Management
+
+
+6.4.2   Creation Of Custom Certificates With Profiles, For Users Managed By BCM’s Internal
+        LDAP
+Custom profiles can be created to include a custom collection of capabilities in cmsh and Base View.
+Cloning of profiles is also possible from cmsh.
+    A certificate file, with an associated expiry date, can be created based on a profile. The time of expiry
+for a certificate cannot be extended after creation. An entirely new certificate is required after expiry of
+the old one.
+    The creation of custom certificates using cmsh (page 331) or Base View (page 332) is described later on.
+After creating such a certificate, the openssl utility can be used to examine its structure and properties.
+In the following example most of the output has been elided in order to highlight the expiry date (30
+days from the time of generation), the common name (democert), the key size (2048), profile properties
+6.4 Tokens And Profiles                                                                              329
+
+(readonly), and system login name (peter), for such a certificate:
+
+[root@basecm11]# openssl x509 -in peterfile.pem -text -noout
+    Data:
+        ...
+            Not After : Sep 21 13:18:27 2014 GMT
+        Subject: ... CN=democert
+                Public-Key: (2048 bit)
+        ...
+        X509v3 extensions:
+            1.3.6.1.4.4324.1:
+                ..readonly
+            1.3.6.1.4.4324.2:
+                ..peter
+[root@basecm11]#
+
+  However, using the openssl utility for managing certificates is rather inconvenient. BCM provides
+more convenient ways to do so, as described next.
+
+Listing Certificates
+All certificates that have been generated by the cluster are noted by CMDaemon.
+
+Listing certificates with cmsh: Within the cert mode of cmsh, the listcertificates command lists
+all cluster certificates and their properties:
+
+[root@basecm11 ~]# cmsh
+[basecm11]% cert
+[basecm11-> cert]% listcertificates
+Serial Revoked Time left     Profile          System log in    Name
+------ -------- ------------ ---------------- ---------------- ------------------------------
+1      No       5214w 1d     admin            root             Administrator
+2      No       5214w 1d     cmhealth                          CMHealth
+3      No       5214w 1d     cmhealth                          CMHealth
+4      No       5214w 1d     power                             Slurm
+5      No       5214w 1d     bootstrap                         CertificateRequest
+6      No       5214w 1d     cmpam                             CMPam
+7      No       5214w 1d     portal                            WebPortal
+...
+
+Listing certificates with Base View: The Base View equivalent for listing certificates is via the naviga-
+tion path Identity Management > Certificates (figure 6.4):
+330                                                                                     User Management
+
+
+
+
+                             Figure 6.4: Base View Certificates List Window
+
+
+
+Node Certificates
+In the certificates list, node certificates that are generated by the node-installer (section 5.4.1) for each
+node for CMDaemon use are listed. These are entries with a node, and look like:
+[basecm11-> cert]% listcertificates
+Serial Revoked Time left     Profile          System log in    Name
+------ -------- ------------ ---------------- ---------------- ------------------------------
+...
+10     No       5214w 1d     node                              fa-16-3e-74-24-dc
+11     No       5214w 1d     node                              fa-16-3e-57-2c-8e
+12     No       5214w 1d     node                              fa-16-3e-b6-c7-4a
+13     No       5214w 1d     node                              fa-16-3e-bd-cd-05
+14     No       5214w 1d     node                              fa-16-3e-0d-ab-ea
+...
+
+Creating A Custom Certificate
+Custom certificates are also listed in the certificates list.
+   Unlike node certificates, which are normally system-generated, custom certificates are typically gen-
+erated by a user with the appropriate tokens in their profile, such as root with the admin profile. Such a
+user can create a certificate containing a specified profile, as discussed in the next section, by using:
+
+   • cmsh: with the createcertificate operation from within cert mode
+
+   • Base View: via the navigation path Identity Management > Users >                 > Profile to set the
+     Profile.
+6.4 Tokens And Profiles                                                                               331
+
+Creating a new certificate for cmsh users: Creating a new certificate in cmsh is done from cert mode
+using the createcertificate command, which has the following help text:
+[basecm11->cert]% help createcertificate
+Name:
+      createcertificate - Create a new certificate
+
+Usage:
+      createcertificate <key-length> <common-name> <organization> <organizational-unit> <loca\
+lity> <state> <country> <profile> <sys-login> <days> <key-file> <cert-file>
+
+Arguments:
+      key-file
+            Path to key file that will be generated
+
+      cert-file
+            Path to pem file that will be generated
+
+   Accordingly, as an example, a certificate file with a read-only profile set to expire in 30 days, to be
+run with the privileges of user peter, can be created with:
+
+Example
+
+
+[basecm11->cert]% createcertificate 2048 democert a b c d ef readonly peter 30 /home/peter\
+/peterfile.key /home/peter/peterfile.pem
+
+Thu Jan 5 15:13:01 2023 [notice] basecm11: New certificate request with ID: 16
+[basecm11->cert]% createcertificate 2048 democert a b c d ef readonly peter 30 /home/peter\
+/peterfile.key /home/peter/peterfile.pem
+Certificate key written to file: /home/peter/peterfile.key
+Certificate pem written to file: /home/peter/peterfile.pem
+
+   The certificate list would show it as something like:
+
+[basecm11-> cert]% listcertificates
+Serial Revoked Time left     Profile          System log in    Name
+------ -------- ------------ ---------------- ---------------- ------------------------------
+...
+23     No       4w 1d        readonly         peter            democert
+
+Setting the ownership of the new custom certificate: The certificates are owned by the owner gener-
+ating them, so they are root-owned if root was running cmsh. This means that user peter cannot use
+them until their ownership is changed to user peter:
+
+Example
+
+[root@basecm11 ~]# cd /home/peter
+[root@basecm11 peter]# ls -l peterfile.*
+-rw------- 1 root root 1704 Aug 22 06:18 peterfile.key
+-rw------- 1 root root 1107 Aug 22 06:18 peterfile.pem
+[root@basecm11 peter]# chown peter:peter peterfile.*
+
+   Other users must have the certificate ownership changed to their own user names.
+332                                                                                     User Management
+
+Associating users with paths to the new custom certificate: Users associated with such a certificate
+can then carry out cmdaemon tasks that have a read-only profile, and CMDaemon sees such users as
+being user peter. Two ways of being associated with the certificate are:
+
+  1. The paths to the pem and key files can be set with the -i and -k options respectively of cmsh. For
+     example, in the home directory of peter, for the files generated in the preceding session, cmsh can
+     be launched with these keys with:
+
+        [peter@basecm11 ~] cmsh -i peterfile.pem -k peterfile.key
+        [basecm11]% quit
+
+  2. If the -i and -k options are not used, then cmsh searches for default keys. The default keys for
+     cmsh are under these paths under $HOME, in the following order of priority:
+         (a) .cm/admin.{pem,key}
+         (b) .cm/cert.{pem,key}
+
+Creating a custom certificate for Base View users: As in the case of cmsh, a Base View user having a
+sufficiently privileged tokens profile, such as the admin profile, can create a certificate and key file for
+themselves or another user. This is done by associating a value for the Profile parameter for the user
+(figure 6.2).
+    The certificate files, cert.pem and cert.key, are then automatically placed in the following paths
+and names, under $HOME for the user:
+   • .cm/admin.{pem,key}
+
+   • .cm/cert.{pem,key}
+     Users that authenticate with their user name and password when running Base View use this cer-
+tificate for their Base View clients, and are then restricted to the set of tasks allowed by their associated
+profile.
+
+6.4.3   Creation Of Custom Certificates With Profiles, For Users Managed By An External
+        LDAP
+The use of an external LDAP server instead of BCM’s for user management is described in section 6.3.
+Generating a certificate for an external LDAP user must be done explicitly in BCM. This can be carried
+out with the external-user-cert script, which is provided with the cluster-tools package. The
+package is installed by default with BCM.
+   Running the external-user-cert script embeds the user and profile in the certificate during certifi-
+cate generation. The script has the following usage:
+
+ external-user-cert -h
+Usage: for a single profile: external-user-cert <profile> <user> [<user> ... ]
+                             --home=<home-prefix> [-g <group>] [-o]
+       for several profiles: external-user-cert --home=<home-prefix>
+                             --file=<inputfile> [-g <group>]
+                             where lines of <inputfile> have the syntax
+                             <profile> <user> [<user> ... ]
+
+Options:
+  -h, --help          show this help message and exit
+  --file=FILE         input FILE
+  --home=HOME_PATH    path for home directories, default /home/
+  -g GROUP            name of primary group, e.g. wheel
+  -o                  overwrite existing certificates
+6.4 Tokens And Profiles                                                                                 333
+
+   Here,
+
+   • <profile> should be a valid profile
+
+   • <user> should be an existing user
+
+   • <home-prefix> is usually /home
+
+   • <group> is a group, such as wheel
+
+   • <inputfile> is a file with each line having the syntax
+
+     <profile> <user> [<user> ...          ]
+
+One or more external LDAP user certificates can be created by the script. The certificate files generated
+are cert.pem and cert.key. They are stored in the home directory of the user.
+    For example, a user spongebob that is managed on the external server, can have a read-only certificate
+generated with:
+# external-user-cert readonly spongebob --home=/home
+
+   If the home directory of spongebob is /home/spongebob, then the key files that are generated are
+/home/spongebob/.cm/cert.key and /home/spongebob/.cm/cert.pem.
+   Assuming no other keys are used by cmsh, a cmsh session that runs as user spongebob with readonly
+privileges can now be launched:
+$ module load cmsh
+$ cmsh
+
+   If other keys do exist, then they may be used according to the logic explained in item 2 on page 332.
+
+6.4.4 Logging The Actions Of CMDaemon Users
+The following directives allow control over the logging of CMDaemon user actions.
+
+   • CMDaemonAudit: Enables logging
+
+   • CMDaemonAuditorFile: Sets log location
+
+   • DisableAuditorForProfiles: Disables logging for particular profiles
+
+Details on these directives are given in Appendix C.
+
+6.4.5 Creation Of Certificates For Nodes With cm-component-certificate
+The cm-component-certificate utility can be used to generate or update SSL certificates for compo-
+nents of services. The cluster administrator is not expected to use this utility because the cluster manager
+manages the certificates without bothering the administrator about it during normal operations. If the
+utilty is to be used, then it should be used with caution, to avoid failure in the components that use these
+certificates.
+    One of the SSL client components for which this utility works is LDAP.
+    Options include setting a new CA and creating a new certificate or key for nodes.
+    Some examples of how it can be used are:
+334                                                                                 User Management
+
+LDAP PEM And Key Creation For A Standalone Node
+A standalone node (page 935) is a node that is not provisioned from the head node, but is configured to
+boot from its own drive. A standalone node <mynode> may have a PEM and key certificate created on
+the head node with:
+Example
+
+[root@basecm11 ~]# cm-component-certificate --generate=<mynode>
+Certificate saved to ./ldap.{pem,key}
+Done.
+
+   The certificates are saved to the working directory. They should be copied over manually to the
+location of the LDAP certificates on mynode. The nslcd daemon on mynode for RHEL8 (or the sssd
+daemon for RHEL9) should then be restarted.
+
+LDAP PEM And Key Creation For A Regular Node
+If a node node001 that is provisioned has a lost or corrupted LDAP key or certificate, then replacements
+for these can be made with:
+Example
+
+[root@basecm11 ~]# cm-component-certificate -n node001
+Sending request to recreate certificates for 1 node to cmd on basecm11
+[(38654705666, 1)] 1 0 0
+1 certificates were successfully recreated
+Done.
+
+   The ldap.{pem,key} files are automatically placed on node001, by default at the location specified
+by the CMDaemon LDAPCertificate and LDAPPrivateKey directives (page 874).
+   The files /cm/node-installer/certificates/<node001-mac>/ldap.{pem,key} should be removed
+on the head node.
+   The nslcd, sssd, and LDAP daemons should be restarted on node001, or more simply it can be
+rebooted if it is not in use. The reboot replaces the ldap.{pem,key} files on the head node with the
+newly-generated ones.
+
+LDAP CA Certificate Creation
+If a new LDAP CA certificate is needed, then a replacement can be made with:
+
+[root@basecm11 ~]# cm-component-certificate --ca
+Sending request to recreate the CA to cmd on basecm11
+Done.
+
+      The following steps must be done manually:
+   • If there is another head node, then the CA files, by default ca.pem and ca.key under /cm/local/
+     apps/openldap/etc/certs/, should be copied over the other head node.
+   • The key/PEM certificate files on all the nodes should be recreated using:
+     cm-component-certificate --allnodes
+   • The old component PEM/key files for each regular node, ldap.pem and ldap.key, under the
+     node-installer directory of the head node(s), should be removed. These certificates are kept
+     under a directory named for the MAC address of the regular node, and follow the pattern:
+     /cm/node-installer/certificates/<MAC address>/<LDAP.{pem,key}>
+   • The node CA files, by default ca.pem and ca.key under /cm/local/apps/openldap/etc/certs/
+     should be copied to the nodes:
+6.4 Tokens And Profiles                                                           335
+
+     Example
+
+     [root@basecm11 ~]# export ldapcertdir="/cm/local/apps/openldap/etc/certs/"
+     for i in {01..12}
+       do
+          scp $ldapcertdir/ca.pem node0$i:/$ldapcertdir
+          scp $ldapcertdir/ca.key node0$i:/$ldapcertdir
+       done
+
+  • The nslcd, sssd and LDAP daemons should be restarted on all nodes
+
+  • CMDaemon should be restarted on the active head node

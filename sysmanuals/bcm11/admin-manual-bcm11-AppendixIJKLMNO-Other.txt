@@ -1,0 +1,1664 @@
+
+                                                                                                I
+         Changing The LDAP Password
+The administrator may wish to change the LDAP root password. This procedure has two steps:
+
+      • setting a new password for the LDAP server (section I.1), and
+
+      • setting the new password in cmd.conf (section I.2).
+
+      It is also a good idea to do some checking afterwards (section I.3).
+
+
+I.1     Setting A New Password For The LDAP Server
+An encrypted password string can be generated as follows:
+[root@basecm11 ~]# module load openldap
+[root@basecm11 ~]# slappasswd
+New password:
+Re-enter new password:
+SSHAJ/3wyO+IqyAwhh8Q4obL8489CWJlHpLg
+
+   The input is the plain text password, and the output is the encrypted password. The encrypted
+password is set as a value for the rootpw tag in the slapd.conf file on the head node:
+
+[root@basecm11 ~]# grep ^rootpw /cm/local/apps/openldap/etc/slapd.conf
+rootpw SSHAJ/3wyO+IqyAwhh8Q4obL8489CWJlHpLg
+
+   The password can also be saved in plain text instead of as an SSHA hash generated with slappasswd,
+but this is considered insecure.
+   After setting the value for rootpw, the LDAP server is restarted:
+[root@basecm11 ~]# systemctl restart slapd
+
+
+I.2     Setting The New Password In cmd.conf
+The new LDAP password (the plain text password that generated the encrypted password after entering
+the slappasswd command in section I.1) is set in cmd.conf. It is kept as clear text for the entry for the
+LDAPPass directive (Appendix C):
+
+[root@basecm11 ~]# grep LDAPPass /cm/local/apps/cmd/etc/cmd.conf
+LDAPPass = "Mysecret1dappassw0rd"
+
+      CMDaemon is then restarted:
+
+[root@basecm11 ~]# systemctl restart cmd
+1016                                                                Changing The LDAP Password
+
+I.3     Checking LDAP Access
+For a default configuration with user cmsupport and domain cm.cluster, the following checks can be
+run from the head node (some output truncated):
+
+      • anonymous access:
+
+        [root@basecm11 ~]# ldapsearch -x
+        # extended LDIF
+        #
+        # LDAPv3
+        # base <dc=cm,dc=cluster> (default) with scope subtree
+        ...
+
+      • root cn without a password (this should fail):
+
+        [root@basecm11 ~]# ldapsearch -x -D 'cn=root,dc=cm,dc=cluster'
+        ldap_bind: Server is unwilling to perform (53)
+         additional info: unauthenticated bind (DN with no password) disallowed
+        [root@basecm11 ~]#
+
+      • root cn with a password (this should work):
+
+        [root@basecm11 ~]# ldapsearch -x -D 'cn=root,dc=cm,dc=cluster' -w Mysecret1dappassw0rd
+        # extended LDIF
+        #
+        # LDAPv3
+        # base <dc=cm,dc=cluster> (default) with scope subtree
+        ...
+                                                                                               J
+                                                                                 Tokens
+This appendix describes authorization tokens available for profiles. Profiles are introduced in Sec-
+tion 6.4:
+    Useful for listing services and tokens are the following cmsh commands, available within the profile
+mode:
+
+   • allservices
+
+   • alltokens
+
+   • showservices
+
+Example
+
+[root@basecm11 ~]# cmsh
+[basecm11]% profile
+[basecm11->profile]% allservices
+auth
+cert
+cloud
+device
+etcd
+gui
+job
+kube
+main
+mon
+net
+part
+proc
+prov
+serv
+session
+status
+test
+user
+
+    Similarly, the output from showservices displays the tokens for the services as indicated in the
+following table:
+1018                                                                                         Tokens
+
+                                     Table J: List Of Tokens
+ Service and token name                 User can...
+ Service: CMAuth
+ ADD_PROFILE_TOKEN                      Add a new profile
+ GET_CMSERVICES_TOKEN                   Get a list of available CMDaemon services
+ GET_PROFILE_TOKEN                      Retrieve list of profiles and profile properties
+ UPDATE_PROFILE_TOKEN                   Update profile
+
+
+ Service: CMCert
+ GET_CERTIFICATE_INFORMATION_TOKEN      Get certificate information
+ GET_CERTIFICATE_INFO_TOKEN             Get certificate information
+ GET_CERTIFICATE_REQUEST_TOKEN          List pending certificate requests
+ GET_CERTIFICATE_TOKEN                  Get certificate
+ INVALIDATE_COMPONENT_CA_TOKEN          Invalidate component CA
+ TOKEN
+ ISSUE_CERTIFICATE_TOKEN                Accept certificate request and issue signed certificate
+ RECREATE_COMPONENT_CERTIFICATE_        Recreate component certificate
+ TOKEN
+ REMOVE_CERTIFICATE_REQUEST_TOKEN       Cancel certificate request
+ REMOVE_CERTIFICATE_TOKEN               Remove a certificate
+ REVOKE_CERTIFICATE_TOKEN               Revoke a certificate
+ UNREVOKE_CERTIFICATE_TOKEN             Unrevoke a revoked certificate
+
+
+ Service: CMCloud
+ ADD_CLOUD_JOB_DESCRIPTION_TOKEN        Add cloud job description
+ ADD_CLOUD_PROVIDER_TOKEN               Add a new cloud provider
+ ADD_OCI_INSTANCE_POOL_TOKEN            Add OCI instance pool
+ AZURE_ACCESS_STRING_TOKEN              Get/set Azure access string
+ CANCEL_ANY_CLOUD_JOB_TOKEN             Cancel any cloud job
+ CLOUD_DIRECTOR_NEW_IP_TOKEN            Set the new External IP of the cloud director
+ DELETE_ANY_ANF_VOLUME_TOKEN            Delete any ANF volume
+ DELETE_ANY_FSX_INSTANCE_TOKEN          Delete any FSX instance
+ EC2_ACCESS_STRING_TOKEN                Get/set Amazon EC2 access string
+ FORGE_ACCESS_STRING_TOKEN              Forge an access string
+ GET_ALL_CLOUD_JOB_DESCRIPTION_TOKEN    Get all cloud job description
+ GET_CLOUD_AMI_TOKEN                    Access Amazon EC2 AMI
+                                                                                           ...continues
+                                                                                           1019
+
+                             Table J: List Of Tokens...continued
+Service and token name                User can...
+GET_CLOUD_JOB_DESCRIPTION_TOKEN       Get cloud job description
+GET_CLOUD_PROVIDER_TOKEN              Get cloud provider information
+GET_CLOUD_REGION_TOKEN                Access Amazon EC2 region
+GET_CLOUD_TYPE_TOKEN                  Access Amazon instance type
+GET_CONSOLE_OUTPUT_TOKEN              Retrieve the console output of the cloud director for de-
+                                      bugging purposes
+GET_KERNEL_INITRD_MD5SUM_TOKEN        Retrieve MD5 sum of initial ramdisk
+GET_OCI_INSTANCE_POOL_TOKEN           Get OCI instance pool
+LIST_ALL_ANF_VOLUMES_TOKEN            List all ANF volumes
+LIST_ALL_FSX_INSTANCES_TOKEN          List all FSX instances
+OCI_ACCESS_STRING_TOKEN               OCI access string
+ON_DEMAND_ANF_TOKEN                   On demand ANF
+ON_DEMAND_FSX_TOKEN                   On demand FSX
+OSCLOUD_ACCESS_STRING_TOKEN           Get/set OpenStack access string
+PUT_USERDATA_TOKEN                    Set AWS user data in AWS
+SEND_CLOUD_STORAGE_ACTION_TOKEN       Send cloud storage action
+SET_CLOUDERRORS_TOKEN                 Set cloud errors
+SHARE_ANF_VOLUME_TOKEN                Share own ANF volumes
+SHARE_FSX_INSTANCE_TOKEN              Share own FSX instances
+SUBMIT_CLOUD_JOB_DESCRIPTION_TOKEN    Submit cloud job description
+TERMINATE_NODE_TOKEN                  Terminate cloud nodes
+UPDATE_CLOUD_JOB_DESCRIPTION_TOKEN    Update cloud job description
+UPDATE_CLOUD_PROVIDER_TOKEN           Update cloud provider settings
+UPDATE_OCI_INSTANCE_POOL_TOKEN        Update OCI instance pool
+USER_MANAGED_ANF_TOKEN                Manage ANF volume
+USER_MANAGED_FSX_TOKEN                Manage FSX volume
+
+
+Service: CMDevice
+ACCESS_SETTINGS_TOKEN                 Access settings
+ADD_CATEGORY_TOKEN                    Create new category
+ADD_CONFIGURATIONOVERLAY_TOKEN        Create new configuration overlay
+ADD_DEVICE_TOKEN                      Add a new device
+ADD_FILE_WRITE_INFO_TOKEN             Add filewriteinfo
+ADD_LITENODE_TOKEN                    Add lite node
+ADD_NODEGROUP_TOKEN                   Add a new nodegroup
+ADD_NODE_HIERARCHY_RULE_TOKEN         Add node hierarchy rule
+ADD_REMOTE_NODE_INSTALLER_            Add a node-installer
+INTERACTION_TOKEN                     interaction (Used by CMDaemon)
+ADD_REPORT_QUERY_TOKEN                Add report query
+ADD_GPU_WORKLOAD_QUERY_               Add GPU workload query performance
+                                                                                    ...continues
+1020                                                                                     Tokens
+
+                                Table J: List Of Tokens...continued
+ Service and token name                    User can...
+ PERFORMANCE_PROFILE_TOKEN                 profile
+ APPLY_DEVICE_COMMANDS_TOKEN               Apply device commands token
+ APPLY_PTM_TOPOLOGY_TOKEN                  Apply PTM Topology
+ BIOS_APPLY_TOKEN                          BIOS apply token
+ BIOS_FETCH_TOKEN                          BIOS fetch token
+ BMC_USERNAME_PASSWORD_TOKEN               View/set BMC (e.g. HP ilo4, IPMI) username and pass-
+                                           word
+ BURN_STATUS_TOKEN                         Get burn status
+ CANCEL_BURN_TOKEN                         Cancel burn token
+ CHANGED_NVDOMAIN_INFO_TOKEN               Changed NVIDIA domain info
+ CHASSIS_USER_PASSWORD_TOKEN               Get/set chassis username and password
+ CHECK_REMOTE_MOUNT_TOKEN                  Check remount mount
+ CLEAR_DISK_ENCRYPTION_PASSPHRASE_TOKEN    Clear disk encryption passphrase
+ COMPLETE_BURN_TOKEN                       Complete burn
+ CREATE_PORT_FORWARD_BURN_TOKEN            Complete port forwarding
+ DIFF_DEVICE_COMMANDS_TOKEN                Diff device commands
+ DIRTY_GPU_WORKLOAD_PERFORMANCE_           Dirty GPU workload performance
+ PROFILE_CACHE_TOKEN                       profile cache
+ FETCH_NVDOMAIN_INFO_TOKEN                 Fetch NVIDIA domain info
+ FIRMWARE_FLASH_TOKEN                      Flash firmware
+ FIRMWARE_INFO_TOKEN                       Get firmware information
+ FIRMWARE_UPLOAD_TOKEN                     Upload firmware
+ FORCE_RECONNECT_TOKEN                     Force reconnect
+ GET_BACKUP_DEVICE_COMMANDS_TOKEN          Get backup device commands
+ GET_BACKUP_INFO_TOKEN                     Get backup information
+ GET_BURN_LOG_TOKEN                        Retrieve burn log
+ GET_BURN_TOKEN                            Get burn token
+ GET_CATEGORY_TOKEN                        Get list of categories
+ GET_CONFIGURATIONOVERLAY_TOKEN            Get list of configuration overlays
+ GET_DEVICE_BY_PORT_TOKEN                  View list of devices according to the ethernet switch port
+                                           that they are connected to
+ GET_DEVICE_COMMANDS_TOKEN                 Get device commands
+ GET_DEVICE_LEAK_INFO_TOKEN                Get device leak info
+ GET_DEVICE_TOKEN                          View all device properties
+ GET_DEVICE_UUID_TOKEN                     View device UUID
+ GET_DHCPD_LEASES_TOKEN                    View device DHCPD leases
+ GET_DISKSETUP_TOKEN                       Get disksetup
+ GET_DPU_TOKEN                             Get DPU
+ GET_EXCLUDE_LIST_TOKEN                    Retrieve the various exclude lists
+ GET_FILE_WRITE_INFO_TOKEN                 Get filewriteinfo
+                                                                                          ...continues
+                                                                                             1021
+
+                                Table J: List Of Tokens...continued
+Service and token name                   User can...
+GET_FINALIZE_SCRIPTS_TOKEN               Get finalize scripts
+GET_FREE_PORTS_TOKEN                     Get free ports info
+GET_GPU_MIG_TOKEN                        Get GPU MIG
+GET_GPU_PROFILING_METRIC_                Get GPU profiling metric info
+INFO_TOKEN
+GET_GPU_PROFILING_STATE_TOKEN            Get GPU profiling state
+GET_GPU_WORKLOAD_PERFORMANCE_            View GPU workload performance
+PROFILE_TOKEN                            profile
+GET_IBSWITCH_TOKEN                       View IB switch properties
+GET_IMEX_CTL_TOKEN                       View IMEX_CTL properties
+GET_INITIALIZE_SCRIPTS_TOKEN             Get initialize scripts
+GET_MINIMAL_CONFIG_TOKEN                 View minimum configuration
+GET_NETWORK_TOPOLOGY_TOKEN               Get network topology
+GET_NODEGROUP_TOKEN                      Get list of nodegroups
+GET_NODE_ACCELERATOR_TOKEN               Get node accelerator count
+GET_NODE_ARCH_OS_TOKEN                   Get architecture and OS
+GET_NODE_HIERARCHY_RULE_TOKEN            Get node hierarchy rule
+GET_NVDOMAIN_INFO_TOKEN                  Get NVIDIA domain info
+GET_NVLINK_INFO_TOKEN                    Get NVIDIA link info
+GET_PORT_BY_MAC_TOKEN                    Determine to which switch port a given MAC is connected
+                                         to.
+GET_PTM_TOPOLOGY_TOKEN                   Get PTM Topology
+GET_REMOTE_NODE_INSTALLER_               Get list of pending
+INTERACTIONS_TOKEN                       installer interactions
+GET_REPORT_QUERY_TOKEN                   Get report query
+GET_SCRIPT_ENVIRONMENT_TOKEN             Get script environment
+GET_SWITCH_COMMAND_TEMPLATES_TOKEN       Get switch command templates
+GET_SWITCH_FIRMWARES_TOKEN               Get switch firmwares
+GET_SWITCH_IMAGES_TOKEN                  Get switch images
+GET_SWITCH_ZTP_TEMPLATES_TOKEN           Get switch ZTP templates
+GET_SYNC_INFO_TOKEN                      Get rsync information
+GET_SYNC_LOG_TOKEN                       Get rsync provisioning log
+GET_SYSINFO_COLLECTOR_TOKEN              Get information about a node (executes dmidecode)
+GET_TFTPBOOT_FILE_INFORMATION_TOKEN      Get tftpboot firmware information
+GET_USED_PORTS_TOKEN                     Get used ports info
+GET_WIREGUARD_INFO_TOKEN                 Get wireguard info
+LIST_DEVICE_COMMANDS_TOKEN               List device commands
+LIST_DPU_BFB_TOKEN                       List DPU BFB
+LIST_IBSWITCH_TOKEN                      List IB switches
+LIST_PORT_FORWARD_TOKEN                  List port forwarding
+                                                                                      ...continues
+1022                                                                                         Tokens
+
+                               Table J: List Of Tokens...continued
+ Service and token name              User can...
+ MALLOC_TRIM_TOKEN                   malloc trim
+ NEW_NODE_TOKEN                      New node
+ NODE_GET_MOUNTPOINTS_TOKEN          Get list of mountpoints defined for a node
+ NODE_IDENTIFY_TOKEN                 Identify a node (RPC API, used by node installer)
+ NVSM_ALERTS_TOKEN                   View NVSM alerts
+ NVSM_HEALTH_TOKEN                   View NVSM health
+ NVSM_INFO_TOKEN                     View NVSM info
+ NVSM_VERSIONS_TOKEN                 View NVSM versions
+ NV_FABRIC_INFO_TOKEN                View NVIDIA fabric info
+ NV_FABRIC_START_STOP_TOKEN          Carry out NVIDIA fabric start and stop
+ NV_FABRIC_START_TOKEN               Carry out NVIDIA fabric start
+ NV_FABRIC_STATUS_TOKEN              View NVIDIA fabric status
+ NV_FABRIC_STOP_TOKEN                Carry out NVIDIA fabric stop
+ PMC_USERNAME_PASSWORD_TOKEN         View/set Power management controller username and
+                                     password
+ POWER_CANCEL_TOKEN                  Power cancel operation
+ POWER_CYCLE_TOKEN                   Power reset a device
+ POWER_OFF_TOKEN                     Power off a device
+ POWER_ON_TOKEN                      Power on a device using BMC or PDU power control
+ POWER_STATUS_TOKEN                  Get power status e.g on or off
+ PPING_TOKEN                         Run parallel ping
+ PREPARE_POWER_OFF_TOKEN             Prepare to power off a device
+ PROXY_SETTINGS_TOKEN                Proxy settings
+ PUSH_DPU_BFB_TOKEN                  Push DPU BPB
+ PUT_SYSINFO_COLLECTOR_TOKEN         Put information about a node
+ REBOOT_NODE_TOKEN                   Reboot a remote a node
+ REDFISH_EVENT_TOKEN                 Redfish event
+ REFRESH_NVDOMAIN_INFO_TOKEN         Refresh NVIDIA domain info
+ REMOVE_BACKUP_TOKEN                 Remove backup information
+ REMOVE_REMOTE_NODE_                 Remove a node installer
+ INSTALLER_INTERACTION_TOKEN         interaction
+ REMOVE_SYSINFO_COLLECTOR_TOKEN      Remove information about a node
+ REPORT_POWER_STATUS_TOKEN           Report power operation history
+ REPORT_QUERY_TOKEN                  Show report query
+ REQUEST_BURN_TOKEN                  Request burn
+ RESET_GPU_TOKEN                     Reset GPU
+ RUN_POST_CHANGE_ACTIONS_TOKEN       Run POST change actions
+ SET_BACKUP_INFO_TOKEN               Set backup information
+ SET_DEVICE_LEAK_INFO_TOKEN          Set device leak info
+ SET_POWER_CONFIG_TOKEN              Set device power configuration
+                                                                                    ...continues
+                                                                                            1023
+
+                            Table J: List Of Tokens...continued
+Service and token name              User can...
+SET_DEVICE_STATUS_TOKEN             Set device status (only via RPC API calls)
+SET_DPU_TOKEN                       Set DPU
+SET_GPU_MIG_TOKEN                   Set GPU MIG
+SET_GPU_WORKLOAD_PERFORMANCE_       Set GPU workload performance
+PROFILE_TOKEN                       profile
+SET_NODE_ACCELERATOR_TOKEN          Set node accelerator
+SET_NODE_ARCH_OS_TOKEN              Set architecture and OS
+SET_NVDOMAIN_INFO_TOKEN             Set NVIDIA domain info
+SHOW_DEVICE_COMMANDS_TOKEN          Show device commands
+SHUTDOWN_NODE_TOKEN                 Shutdown a remote node managed by CMDaemon
+SNMP_SETTINGS_TOKEN                 Manage SNMP settings
+START_BURN_TOKEN                    Start burn
+STOP_BURN_TOKEN                     Stop burn
+SYSINFO_COLLECTOR_TOKEN             Manage information about a node
+TAKE_BACKUP_DEVICE_COMMANDS_TOKEN   Take backup device commands
+UPDATE_CATEGORY_TOKEN               Update a category property
+UPDATE_CONFIGURATIONOVERLAY_TOKEN   Update a configuration overlay property
+UPDATE_DEVICE_TOKEN                 Update device properties
+UPDATE_GPU_PROFILING_METRIC_        Update GPU profiling metric info
+INFO_TOKEN
+UPDATE_GPU_PROFILING_STATE_TOKEN    Update GPU profiling state
+UPDATE_LITENODE_TOKEN               Update lite node
+UPDATE_NODEGROUP_TOKEN              Update nodegroup properties (e.g. add a new member
+                                    node)
+UPDATE_NODE_HIERARCHY_RULE_TOKEN    Update node hierarchy rule
+UPDATE_REMOTE_NODE_INSTALLER_       Update installer
+INTERACTIONS_TOKEN                  interactions (e.g. confirm full provisioning)
+UPDATE_REPORT_QUERY_TOKEN           Update report query
+UPDATE_STATUS_TOKEN                 Update status
+UPDATE_SWITCH_TOKEN                 Update switch
+UPDATE_SYSINFO_COLLECTOR_TOKEN      Update information about a node
+UPGRADE_IBSWITCH_TOKEN              Carry out IB switch upgrade
+
+
+Service: CMEtcd
+ADD_ETCD_TOKEN                      Add etcd
+GET_ETCD_TOKEN                      Get etcd
+UPDATE_ETCD_TOKEN                   Update etcd
+
+
+Service: CMGui
+EXPAND_COLLAPSE_TOKEN               Get cluster overview
+                                                                                    ...continues
+1024                                                                                        Tokens
+
+                             Table J: List Of Tokens...continued
+ Service and token name             User can...
+ GET_CDU_OVERVIEW_TOKEN             Get CDU overview
+ GET_CLUSTER_OVERVIEW_TOKEN         Get cluster overview
+ GET_KUBE_OVERVIEW_TOKEN            Get kube cluster overview
+ GET_NODE_OVERVIEW_TOKEN            Get node overview
+ GET_NODE_STATUS_TOKEN              Get node status
+ GET_PDU_OVERVIEW_TOKEN             Get PDU overview
+ GET_POWER_CIRCUIT_OVERVIEW_TOKEN   Get power circuit overview
+ GET_POWER_SHELF_OVERVIEW_TOKEN     Get power shelf overview
+ GET_RACK_OVERVIEW_TOKEN            Get rack overview
+ GET_SWITCH_OVERVIEW_TOKEN          Get switch overview
+
+
+ Service: CMJob
+ ADD_CHARGE_BACK_REQUEST_TOKEN      Add chargeback request
+ ADD_JOBQUEUE_TOKEN                 Add a new job queue
+ ADD_WLM_CLUSTER_TOKEN              Add WLM cluster
+ CHARGE_BACK_BY_KEY_TOKEN           Show chargeback by key
+ CHARGE_BACK_TOKEN                  Show chargeback
+ CHECK_NODE_ALLOCATION_TOKEN        Check node allocation
+ DRAIN_OVERVIEW_TOKEN               Obtain list of drained nodes
+ DRAIN_TOKEN                        Drain a node
+ FLUSH_JOB_INFO_TOKEN               Flush job info
+ GET_CHARGE_BACK_REQUEST_TOKEN      Get chargeback request
+ GET_JOBINFO_TOKEN                  Get job information
+ GET_JOBQUEUE_TOKEN                 Retrieve list of job queues and properties
+ GET_JOB_PID_GPUS_INFO_TOKEN        Get job PID GPUs info
+ GET_JOB_TOKEN                      Get list of jobs that are currently running
+ GET_OWN_JOBINFO_TOKEN              Get own job information
+ GET_OWN_JOB_TOKEN                  Get list of own jobs that are currently running
+ GET_PE_TOKEN                       Get list of SGE parallel environments
+ GET_TOPOLOGY_TOKEN                 Get topology
+ GET_TRACKED_JOBS_TOKEN             Get tracked jobs
+ GET_WLM_CLUSTER_TOKEN              Get WLM cluster
+ GET_WLM_POWER_SAVING_TOKEN         Get WLM power saving status
+ HOLD_JOB_TOKEN                     Place a job on hold
+ HOLD_OWN_JOB_TOKEN                 Place own job on hold
+ JOB_NODE_GRID_TOKEN                Show job node grid
+ JOB_STARTED_ENDED_TOKEN            Show job started/ended
+ NOTIFY_JOB_END_TOKEN               Notify job end
+ RELEASE_JOB_TOKEN                  Release a held job
+                                                                                      ...continues
+                                                                                            1025
+
+                              Table J: List Of Tokens...continued
+Service and token name                  User can...
+RELEASE_OWN_JOB_TOKEN                   Release own job
+REMOVE_JOBINFO_TOKEN                    Remove job information
+REQUEUE_JOB_TOKEN                       Requeue a job
+REQUEUE_OWN_JOB_TOKEN                   Requeue own job
+RESUME_JOB_TOKEN                        Resume suspended job
+RESUME_OWN_JOB_TOKEN                    Resume own job
+SET_PERSISTENT_JOBINFO_TOKEN            Set persistent job information
+SUBMIT_JOB_TOKEN                        Submit a job using JSON
+SUSPEND_JOB_TOKEN                       Suspend a job
+SUSPEND_OWN_JOB_TOKEN                   Suspend own job
+UPDATE_CHARGE_BACK_REQUEST_TOKEN        Update chargeback request
+UPDATE_JOBQUEUE_TOKEN                   Modify job queues
+UPDATE_JOB_TOKEN                        Update job run-timer parameters
+UPDATE_OWN_JOB_TOKEN                    Update own job
+UPDATE_TOPOLOGY_TOKEN                   Update topology
+UPDATE_WLM_CLUSTER_SERVER_TOKEN         Update WLM cluster server
+UPDATE_WLM_CLUSTER_TOKEN                Update WLM cluster
+
+
+Service: CMKube
+ADD_KUBE_TOKEN                          Add Kube
+DRAIN_KUBE_OVERVIEW_TOKEN               Drain Kube overview
+DRAIN_KUBE_TOKEN                        Drain Kube
+GET_CAPI_IMAGE_VERSIONS_TOKEN           Get CAPI image versions
+GET_CAPI_TOKEN                          Get CAPI
+GET_KUBE_JOIN_TOKEN                     Get Kube join
+GET_KUBE_TOKEN                          Get Kube
+KUBE_MANAGED_LABELS_TOKEN               Get Kube managed labels response
+UPDATE_CAPI_IMAGE_VERSIONS_TOKEN        Update CAPI image versions
+UPDATE_CAPI_TOKEN                       Update CAPI
+UPDATE_KUBE_TOKEN                       Update Kube
+
+
+Service: CMMain
+CANCEL_BACKGROUND_TASKS_TOKEN           Cancel background tasks
+CMDAEMON_FAILOVER_TOKEN                 Set CMDaemon failover condition achieved
+CM_SETUP_EXECUTE_TOKEN                  Execute
+CM_SETUP_GET_EXECUTION_TOKEN            Get execution
+CM_SETUP_REMOVE_EXECUTION_TOKEN         Remove execution
+GENERIC_CALL_TOKEN                      Make a generic call
+GET_ALL_ACTIVE_PASSIVE_UP_KEYS_TOKEN    Get keys for all active and passive nodes that are up
+                                                                                        ...continues
+1026                                                                                 Tokens
+
+                                Table J: List Of Tokens...continued
+ Service and token name                    User can...
+ GET_BACKGROUND_TASKS_TOKEN                Get background tasks
+ GET_CLUSTER_SETUP_TOKEN                   Get cluster configuration
+ GET_CONFIG_TOKEN                          Get configuration
+ GET_FROZEN_FILES_TOKEN                    Get frozen files
+ GET_HARDWARE_OVERVIEW_TOKEN               Get frozen files
+ GET_LICENSE_INFO_TOKEN                    Retrieve information about BCM license
+ GET_SERVER_STATUS_TOKEN                   Head node status (e.g. ACTIVE, BECOMEACTIVE etc.)
+ GET_SERVICESTATE_TOKEN                    Get the state of a service
+ GET_VERSION_TOKEN                         Get CMDaemon version and revision
+ GET_XSD_SCHEMA_TOKEN                      Get XSD schema
+ IMPORT_ENTITY_TOKEN                       Import an entity
+ PING_TOKEN                                TCP SYN ping managed devices
+ REPORT_CRITICAL_ERROR_TOKEN               View critical error report
+ SAVE_FILE_TOKEN                           Save a file on a remote node
+ SET_SERVICESTATE_TOKEN                    Set the state of a service
+ START_REQUEST_REMOTE_ASSISTANCE_TOKEN     Start request-remote-assistance
+ STATUS_REQUEST_REMOTE_ASSISTANCE_TOKEN    See status of request-remote-assistance
+ STOP_REQUEST_REMOTE_ASSISTANCE_TOKEN      Stop request-remote-assistance
+ STORE_CONFIG_FILE_VERSION_TOKEN           Store config file version
+ STORE_LDAP_CERTIFICATES_TOKEN             Store LDAP certificates
+ STORE_PRS_CERTIFICATES_TOKEN              Store PRS certificates
+
+
+ Service: CMMon
+ ADD_ENTITY_MEASURABLE_TOKEN               Add entity measurable
+ ADD_LABELED_ENTITY_TOKEN                  Add labeled entity
+ ADD_MONITORING_ACTION_TOKEN               Add monitoring action
+ ADD_MONITORING_DATA_PRODUCER_TOKEN        Add monitoring data producer
+ ADD_MONITORING_MEASURABLE_TOKEN           Add monitoring measurable
+ ADD_MONITORING_STANDALONE_TOKEN           Add monitoring standalone
+ ADD_MONITORING_TRIGGER_TOKEN              Add monitoring trigger
+ ADD_PROMETHEUS_QUERY_TOKEN                Add Prometheus query
+ BACKUP_INFORMATION_TOKEN                  Show backup information
+ CREATE_MONITORING_MEASURABLE_TOKEN        Create monitoring measurable
+ DROP_MONITORING_DATA_TOKEN                Drop monitoring data
+ EXECUTE_QUERY_BY_KEY_TOKEN                Execute Prometheus query by key
+ EXECUTE_QUERY_TOKEN                       Execute Prometheus query
+ FETCH_CACHE_TOKEN                         Fetch the cache
+ GET_DYNAMIC_RESOURCES_TOKEN               Get a dynamic resource
+ GET_ENTITY_MEASURABLE_TOKEN               Get entity measurable
+                                                                                      ...continues
+                                                                                        1027
+
+                                Table J: List Of Tokens...continued
+Service and token name                       User can...
+GET_INFO_MESSAGE_TOKEN                       Get info message
+GET_LABELED_ENTITY_TOKEN                     Get labeled entity
+GET_MONITORING_ACTION_TOKEN                  Get monitoring action
+GET_MONITORING_CONSOLIDATOR_TOKEN            Get monitoring consolidator
+GET_MONITORING_DATA_PRODUCER_TOKEN           Get monitoring data producer
+GET_MONITORING_MEASURABLE_TOKEN              Get monitoring measurable
+GET_MONITORING_STANDALONE_TOKEN              Get monitoring standalone
+GET_MONITORING_TRIGGER_TOKEN                 Get monitoring trigger
+GET_PICKUP_INTERVAL_TOKEN                    Get pickup interval
+GET_PROMETHEUS_JOB_EXTRA_LABEL_              Get Prometheus extra label cache
+CACHE_TOKEN
+GET_PROMETHEUS_QUERY_TOKEN                   Get Prometheus query
+GET_TRIGGER_DATA_TOKEN                       Get monitoring trigger evaluation data
+HEALTH_CHECK_WLM_JOB_TOKEN                   Manage health checks for WLM job
+INTERNAL_DROP_MONITORING_DATA_TOKEN          Internal dropmonitoringdata
+INTERNAL_RUN_ACTION_TOKEN                    Internal run action
+INTERNAL_SAMPLE_NOW_TOKEN                    Internal samplenow
+MONITORING_CLEANUP_TOKEN                     Monitoring cleanup
+MONITORING_INFO_TOKEN                        Monitoring info
+MONITORING_LITE_TOKEN                        Monitoring lite node
+MONITORING_MANAGE_TOKEN                      Manage monitoring configuration settings
+MONITORING_PREPARE_CONTINUE_BACKUP_TOKEN     Monitor prepare continue backup
+MONITORING_PUSH_TOKEN                        Monitoring push
+MONITORING_TREE_DEFAULT_SHOW_TOKEN           Monitoring tree default show
+NEW_LABELED_ENTITY_TOKEN                     Use new labeled entity
+NEW_MEASURABLE_TOKEN                         New measurable token
+OFFLOAD_INFORMATION_TOKEN                    Get offload information
+PLOT_TOKEN                                   Request plot
+PRIVATE_MONITORING_TOKEN                     Private monitoring
+PROMETHEUS_EXPORTER_TOKEN                    Show Prometheus exporter
+PROMETHEUS_METRIC_TOKEN                      Show Prometheus metric
+PUT_OFFLOAD_INFORMATION_TOKEN                Put offload information
+REINITIALIZE_TOKEN                           Reinitialize data producers
+REQUEST_PICKUP_INTERVAL_TOKEN                Request monitoring pickup interval
+SAMPLE_NOW_TOKEN                             Sample now
+STATE_TRANSITION_TOKEN                       State transition
+UPDATE_DYNAMIC_RESOURCES_TOKEN               Update a dynamic resource
+UPDATE_LABELED_ENTITY_TOKEN                  Update labeled entity
+UPDATE_MONITORING_ACTION_TOKEN               Update monitoring action
+                                                                                        ...continues
+1028                                                                                  Tokens
+
+                                Table J: List Of Tokens...continued
+ Service and token name                    User can...
+ UPDATE_MONITORING_CONSOLIDATOR_TOKEN      Update monitoring consolidator
+ UPDATE_MONITORING_DATA_PRODUCER_TOKEN     Update monitoring data producer
+ UPDATE_MONITORING_MEASURABLE_TOKEN        Update monitoring measurable
+ UPDATE_MONITORING_STANDALONE_TOKEN        Update monitoring standalone
+ UPDATE_MONITORING_TRIGGER_TOKEN           Update monitoring trigger
+ UPDATE_PROMETHEUS_JOB_EXTRA_              Update Prometheus job extra label cache
+ LABEL_CACHE_TOKEN
+ UPDATE_PROMETHEUS_QUERY_TOKEN             Update Prometheus query
+
+
+ Service: CMNet
+ ADD_NETWORK_TOKEN                         Add network settings
+ GET_NETWORK_TOKEN                         Get network settings
+ UPDATE_NETWORK_TOKEN                      Update network settings
+
+
+ Service: CMPart
+ ADD_EDGE_SITE_TOKEN                       Add edge site
+ ADD_PARTITION_TOKEN                       Add partition settings
+ ADD_POWER_CIRCUIT_TOKEN                   Add power circuit
+ ADD_RACK_TOKEN                            Add rack settings
+ ADD_SOFTWAREIMAGE_FILE_SELECTION_TOKEN    Add softwareimage file selection
+ ADD_SOFTWAREIMAGE_TOKEN                   Add softwareimage settings
+ CMDAEMON_CLEAN_STOP_TOKEN                 Obtain cleanliness status of stop
+ CMDAEMON_FAILOVER_SLAVE_RESULT_TOKEN      Obtain status of slave result
+ CMDAEMON_FAILOVER_SLAVE_TOKEN             Obtain status of slave
+ CMDAEMON_FAILOVER_STATUS_TOKEN            Obtain status of failover
+ CMDAEMON_FAILOVER_TOKEN                   Set CMDaemon failover condition achieved
+ CMDAEMON_QUORUM_TOKEN                     Set CMDaemon quorum achieved
+ CMDAEMON_RESOURCE_MIGRATE_TOKEN           Obtain status of resource migration
+ CMDAEMON_RESOURCE_STATUS_TOKEN            Obtain status of resource
+ CREATE_RAMDISK_TOKEN                      Create ramdisk
+ EDGE_SITE_SECRET_TOKEN                    Show edge site secret
+ FORGET_RACK_ISOLATION_REQUEST_            Forget rack isolation request info
+ INFO_TOKEN
+ GET_EDGE_SITE_TOKEN                       Get edge site
+ GET_GNSS_LOCATION_TOKEN                   Get GNSS location
+ GET_NODE_ARCH_OS_TOKEN                    Get architecture and OS
+ GET_PARTITION_TOKEN                       Get partition settings
+ GET_POWER_CIRCUIT_TOKEN                   Get power circuit
+ GET_PRS_STATUS_TOKEN                      Get PRS status
+                                                                                       ...continues
+                                                                                            1029
+
+                                Table J: List Of Tokens...continued
+Service and token name                       User can...
+GET_RACK_ISOLATION_REQUEST_                  Get rack isolation request info
+INFO_TOKEN
+GET_RACK_TOKEN                               Get rack settings
+GET_RAW_NMX_TOKEN                            Get raw NMX settings
+GET_SOFTWAREIMAGE_FILE_SELECTION_TOKEN       Get softwareimage file selection
+GET_SOFTWAREIMAGE_TOKEN                      Get softwareimage settings
+HANDLE_RACK_ISOLATION_REQUEST_               Handle rack isolation request info
+INFO_TOKEN
+KERNEL_CONFIG_HASH_TOKEN                     Kernel config hash
+NETQ_SETTINGS_TOKEN                          Show NETQ settings
+NMXM_SETTINGS_TOKEN                          Show NMX Management settings
+REQUEST_RACK_ELECTRICAL_ISOLATION_           Request rack electrical isolation
+TOKEN
+REQUEST_RACK_LIQUID_ISOLATION_TOKEN          Request rack liquid isolation
+SET_GNSS_LOCATION_TOKEN                      Set GNSS location
+START_PRS_DOMAIN_TOKEN                       Set PRS domain
+STOP_PRS_DOMAIN_TOKEN                        Stop PRS domain
+UFM_SETTINGS_TOKEN                           Show UFM settings
+UPDATE_EDGE_SITE_TOKEN                       Update edge site
+UPDATE_GNSS_LOCATION_TOKEN                   Update GNSS location
+UPDATE_PARTITION_TOKEN                       Update partition settings
+UPDATE_POWER_CIRCUIT_TOKEN                   Update power circuit settings
+UPDATE_RACK_TOKEN                            Update rack settings
+UPDATE_RAW_NMX_TOKEN                         Update raw NMX settings
+UPDATE_SOFTWAREIMAGE_FILE_SELECTION_TOKEN    Update softwareimage file selection
+UPDATE_SOFTWAREIMAGE_TOKEN                   Update softwareimage settings
+
+
+Service: CMProc
+CLEAN_IPC_TOKEN                              Clear IPC state
+EXEC_COMMAND_TOKEN                           Execute a command on a head node
+EXEC_INTERNAL_COMMAND_TOKEN                  Execute internal command (defined in the source code,
+                                             RPC API, internal)
+GET_ALL_PROCESSES_TOKEN                      Retrieve list of all processes that are currently running on
+                                             a device managed by CMDaemon
+GET_MSGQUEUE_TOKEN                           Get message queue status
+GET_PROCESS_TOKEN                            Retrieve list of processes that are currently running on a
+                                             device managed by CMDaemon
+GET_SEMAPHORE_TOKEN                          Get semaphore
+GET_SHARED_MEM_TOKEN                         Get shared memory
+SEND_SIGNAL_TOKEN                            Send signal to a process
+START_SHELL_TOKEN                            Start SSH session
+                                                                                              ...continues
+1030                                                                                           Tokens
+
+                               Table J: List Of Tokens...continued
+ Service and token name                User can...
+
+
+ Service: CMProv
+ ADD_FSPART_TOKEN                      Set FSPart (internal)
+ CANCEL_PROVISIONING_REQUEST_TOKEN     Cancel provisioning request
+ FSPART_BACKUP_TOKEN                   Show FSPart backup
+ GET_FSPART_ASSOCIATION_TOKEN          Get FSPart association
+ GET_FSPART_TOKEN                      Get FSPart (internal)
+ GET_LAST_PROVISIONING_NODE_TOKEN      Get last provisioning node
+ GRAB_IMAGEUPDATE_TOKEN                Grab changes from node to software image and vice versa
+ IMAGEUPDATE_TOKEN                     Send image changes to nodes
+ LOCK_FSPART_TOKEN                     Lock FSPart
+ MANAGE_RSYNC_DAEMON_TOKEN             Manage the rsync process (CMDaemon)
+ PROVISIONERS_STATUS_TOKEN             Check status of provisioners e.g. images are in sync
+ REQUEST_PROVISIONING_TOKEN            Request provisioning (nodes with a provisioning role)
+ RUN_FSPART_SYNC_SCRIPT_TOKEN          RUN FSPart sync script
+ RUN_PROVISIONINGPROCESSORJOB_         Start and run a
+ TOKEN                                 provisioning job (nodes with a provisioning role)
+ UPDATEPROVISIONERS_TOKEN              Synchronize software images across provisioning systems
+                                       (requires at least two provisioners)
+ UPDATE_CONFIG_FILES_AFTER_IMAGE_      Update config files after image update
+ UPDATE_TOKEN
+ UPDATE_FSPART_ASSOCIATION_TOKEN       Update FSPart association
+ UPDATE_FSPART_TOKEN                   Update FSPart (internal)
+ UPDATE_PROVISIONINGPROCESSORJOB_      Update status of running
+ TOKEN                                 provisioning jobs (CMDaemon)
+
+
+ Service: CMServ
+ CALLINIT_OSSERVICE_TOKEN              Call init (useful for the node-installer itself)
+ GET_OSSERVICE_TOKEN                   Get system service information
+ RELOAD_OSSERVICE_TOKEN                Reload system services
+ RESET_OSSERVICE_TOKEN                 Reset system services
+ RESTART_OSSERVICE_TOKEN               Restart system services
+ RESTART_WLM_OSSERVICE_TOKEN           Restart WLM systemservices
+ START_OSSERVICE_TOKEN                 Start system services (service foo start)
+ STOP_OSSERVICE_TOKEN                  Stop system services
+ UPDATE_OSSERVICE_TOKEN                Update system services
+
+
+ Service: CMSession
+ CLIENT_USER_DATA_TOKEN                Show client user data
+ END_SESSION_TOKEN                     Terminate sessions
+                                                                                          ...continues
+                                                                                        1031
+
+                              Table J: List Of Tokens...continued
+Service and token name                   User can...
+GET_BROADCAST_EVENTS_TOKEN               Receive broadcast events
+GET_SESSION_TOKEN                        Retrieve session information
+HANDLE_EVENT_TOKEN                       Handle events
+LIST_CLIENT_USER_DATA_TOKEN              List client user data
+REGISTER_LITENODE_SESSION_TOKEN          Register lite node
+REGISTER_NODE_SESSION_TOKEN              Register new nodes in a special CMDaemon session (node-
+                                         installer)
+
+
+Service: CMStatus
+GET_DEVICE_STATUS_TOKEN                  Get device status
+INTERNAL_STATUS_TOKEN                    Show internal status information
+SET_DEVICE_STATUS_TOKEN                  Set device status
+STATUS_INFO_TOKEN                        Show status information
+STATUS_MANAGE_TOKEN                      Show managed status
+
+
+Service: CMTest
+GET_MANAGERS_STATE_TOKEN                 Get managers state
+
+
+Service: CMUser
+ADD_GROUP_TOKEN                          Add a new LDAP group
+ADD_USER_TOKEN                           Add a new LDAP user
+CHECK_ACCESS_TOKEN                       Check project manager access
+CREATE_MISSING_HOME_DIRECTORIES_TOKEN    Create missing home directories
+GET_DISABLED_PASSWORD_SSH_TOKEN          Get disabled ssh password
+GET_GROUP_TOKEN                          Retrieve group information
+GET_USER_TOKEN                           Retrieve user information
+REGENERATE_USER_CERTIFICATES_TOKEN       Regenerate user certificates
+SET_DISABLED_PASSWORD_SSH_TOKEN          Disable password for SSH
+SET_USER_CLOUD_JOB_TOKEN                 Set user cloud job
+SET_USER_PROFILE__TOKEN                  Set user profile
+UPDATE_GROUP_TOKEN                       Modify an existing LDAP group
+UPDATE_USER_TOKEN                        Modify an existing LDAP user
+                                                                                      K
+          Understanding Consolidation
+K.1    Introduction
+Consolidation is discussed in the sections on using consolidation in the Monitoring chapter (sec-
+tions 10.4.3 and 10.5.2).
+    However, it may be confusing to have the concept of consolidation discussed in the same place as
+the use of consolidation. Also, the algebra that appears in that discussion (page 589) may not appeal
+to people. There are many who would like an explanation that may be more intuitive, even if it is less
+rigorous.
+    Therefore, in this section a more informal and visual approach is taken to explain consolidation.
+
+
+K.2    What Is Consolidation?
+Consolidation is the compression of data, for data values that have been measured over a fixed interval.
+  The compression is nothing particularly sophisticated. It is carried out by using some simple math-
+ematical functions to the data points: the average, the maximum, or the minimum.
+
+
+K.3    Raw Data And Consolidation
+Suppose raw data is sampled every 2 minutes.
+   And the raw data values are consolidated every 10 minutes.
+   A visual representation of the data values available to the system is:
+
+                           --- time --->
+raw:             | | | | | | | | | | | | | | | | |
+consolidated:    |       |       |       |       |
+
+   Here, every “|”" indicates a data point, so that the visual shows 5 times as many raw data points as
+consolidated data values.
+   In the preceding visual it makes no sense to use consolidated data since the data values for raw data
+and consolidated data overlap. I.e., the more accurate raw data values exist for the entire period.
+   As time passes, the intention is to start dropping old raw data, to save space on the disk.
+   For example, for the first 20 minutes in the following visual, there are no longer raw data values
+available:
+
+Example
+
+                            --- time --->
+raw:                              | | | | | | | | | | | | | |
+consolidated:    |        |       |       |       |       |
+1034                                                                     Understanding Consolidation
+
+    But the consolidated data points for this period are still available to the system.
+    When the data values are plotted in Base View graphs, periods without raw data values automati-
+cally have consolidated data values used.
+    So a combination of both data sources is used, which can be visually represented with:
+
+Example
+
+                              --- time --->
+plot:            |        |         | | | | | | | | | | | | | |
+
+    That behavior holds true for cmsh too.
+    The behavior illustrated in the last visual assumes that the cluster has been UP for long enough that
+raw data is being dropped.
+    In this case, “long enough” means at least 7 days.
+    However, because RLE (Run Length Encoding) is used to compress the sampled monitoring data
+values on disk, this minimal “long enough” time can be (much) longer than 7 days. It depends on how
+much the measurable that is being sampled is changing as each sample is taken. if it is not changing,
+then RLE can compress over a longer time period.
+    For example, if a node has been up and reachable without issues for 1000 days, then the ssh2node
+health check raw data values would be PASS over that 1000 days. For the period from now to 7 days
+ago, the raw data values of PASS are kept as they are for now. However, for the period from 7 days ago
+to 1000 days ago, consolidation on the unchanging raw values means that only two values, namely the
+PASS value of 1000 days and the PASS value of 7 days ago, need to be retained, in order to have a totally
+accurate record of what the values were in that period.
+    On the other hand, the forks metric changes very quickly, and thus can do little RLE compression.
+That makes it a good choice for demonstrating the kind of output that the preceding visuals imply.
+
+
+K.4     A Demonstration Of The Output
+So, as a demonstration, the last 7 days for forks are now shown, with the data values in the middle
+elided:
+
+Example
+
+[basecm11->device[basecm11]]% dumpmonitoringdata -7d now forks
+Timestamp                  Value                Info
+-------------------------- -------------------- ----------
+2018/10/17 10:30:00        2.76243 processes/s
+2018/10/17 11:30:00        2.52528 processes/s
+2018/10/17 12:30:00        2.53972 processes/s
+...
+2018/10/24 10:42:00        2.66669 processes/s
+2018/10/24 10:44:00        2.63333 processes/s
+2018/10/24 10:46:00        2.64167 processes/s
+
+   The first part of the output shows samples listed every hour. These are the consolidated data values.
+   The last part of the output shows samples listed every 2 minutes. These are the raw data value
+values.
+   I.e.: consolidated data values are used beyond a certain time in the past.
+   If the administrator would like to explore this further, then displaying only consolidation values is
+possible in cmsh by using the --consolidationinterval option of the dumpmonitoringdata command:
+
+Example
+K.4 A Demonstration Of The Output                                                           1035
+
+[basecm11->device[basecm11]]% dumpmonitoringdata --consolidationinterval 1h -7d now forks
+Timestamp                  Value                Info
+-------------------------- -------------------- ----------
+2019/01/07 11:39:06        2.65704 processes/s
+2019/01/07 12:30:00        2.60111 processes/s
+2019/01/07 13:30:00        2.58328 processes/s
+...
+[basecm11->device[basecm11]]% dumpmonitoringdata --consolidationinterval 1d -7d now forks
+Timestamp                  Value                Info
+-------------------------- -------------------- ----------
+2019/01/07 18:09:06        2.59586 processes/s
+2019/01/08 13:00:00        2.58953 processes/s
+2019/01/09 06:06:06        2.58854 processes/s
+[basecm11->device[basecm11]]% dumpmonitoringdata --consolidationinterval 1w -7d now forks
+Timestamp                  Value                Info
+-------------------------- -------------------- ----------
+2019/01/08 11:15:12.194    2.59113 processes/s
+                                                                                           L
+                 Node Execution Filters And
+                    Execution Multiplexers
+Node execution filters and execution multiplexers define where data producers are executed on the
+nodes of a cluster, and what nodes are targeted to obtain the data.
+   This appendix explains how node execution filters and execution multiplexers work with the help of
+some explicit basic examples. The aim is to have the cluster administrator understand how they work
+and how to use them.
+   The reference cluster in this section is a 5-node cluster, made up of a head node (basecm11) and 4
+regular nodes (node001..node004). The commands run in this appendix are carried out during a cmsh
+session that continues on from the point that it left off earlier.
+   The terms “node execution filters” and “execution multiplexers” are commonly abbreviated to filters
+and multiplexers in this appendix.
+   A simple custom data producer script is created and used to explain some of the more-involved
+concepts of filters and multiplexers more clearly. The custom script is:
+
+[root@basecm11 ~]# cat /cm/shared/fm.sh
+#!/bin/bash
+
+echo $((RANDOM%100))
+echo "Sampled on $(hostname) for $CMD_HOSTNAME" >&3
+
+   It should be made executable, for example, with chmod a+x. When run, the script outputs a random
+number, it outputs the host it is being run on ($(hostname)), and also the host the metric is targeting
+($CMD_HOSTNAME). The hosts that it is run on can be defined by filters, while the hosts that are targeted
+by the metric can be defined by multiplexers.
+
+The Term Multiplex: The word “multiplex” can be confusing to system administrators. In electronics,
+the term multiplex implies that signals are being gathered from various inputs, and going into a main
+input.
+   Here the idea is applicable to the signals (samples) from the execution multiplexers (nodes where the
+samples are). The samples are multiplexed (gathered) from those nodes, to the node (or nodes) where
+the data producer is executing.
+
+   • The execution of the data producer is on the node (or nodes) defined by nodeexecutionfilter.
+     The data producer execution nodes are the ones listed using the nodes command of cmsh.
+
+   • The nodes where the samples are obtained from are defined by the executionmultiplexer set-
+     ting. Those muliplexer nodes can have their samples displayed as output using the samplenow
+     command (section 10.6.2, page 618) of cmsh.
+1038                                                 Node Execution Filters And Execution Multiplexers
+
+L.1    Data Producers: Default Configuration For Running And Sampling
+If there is no configuration defined for the data producer in the filters or multiplexers for that data
+producer, then each node runs a data producer on itself, and that data producer targets the node that it
+is running on.
+    For example, the existing dmesg data producer comprises the dmesg health check (section G.2.1) and
+by default has no filter or multiplexer defined for it. If an attempt is made to list any filter or multiplexer
+for dmesg, then by default there is no content under the table headings:
+
+[root@basecm11 ~]# cmsh
+[basecm11]% monitoring setup
+[basecm11->monitoring->setup]% nodeexecutionfilters dmesg; list; ..;..
+Type         Name (key)               Filter                   Filter operation
+------------ ------------------------ ------------------------ ----------------
+[basecm11->monitoring->setup]% executionmultiplexers dmesg; list; ..;..
+Name (key)
+------------------------
+
+   Another way of seeing that no such filters or multiplexers have been defined for dmesg could be by
+seeing that none are defined in its submodes:
+
+[basecm11->monitoring->setup]% show dmesg | grep submode
+Execution multiplexer            <0 in submode>
+Node execution filters           <0 in submode>
+
+   Most existing data producers have filters and multiplexers defined. The number of filters and multi-
+plexers set per data producer can conveniently be viewed via list formatting:
+
+Example
+
+[basecm11->monitoring->setup]% list -f name,nodeexecutionfilters,executionmultiplexer | more
+name (key)           nodeexecutionfilters executionmultiplexer
+-------------------- -------------------- --------------------
+AggregateNode        <1 in submode>       <1 in submode>
+AggregatePDU         <1 in submode>       <1 in submode>
+AlertLevel           <1 in submode>       <1 in submode>
+CMDaemonState        <0 in submode>       <0 in submode>
+Cassandra            <1 in submode>       <0 in submode>
+ClusterTotal         <1 in submode>       <0 in submode>
+DeviceState          <1 in submode>       <0 in submode>
+...
+
+L.1.1 Nodes That Data Producers Are Running On By Default—The nodes Command
+The nodes command shows which nodes the data producer runs on. By default, the data producer runs
+on all nodes, when nothing has been set explicitly, because each node runs the data producer for itself:
+
+[basecm11->monitoring->setup]% nodes dmesg
+node001..node004,basecm11
+
+L.1.2 Nodes That Data Producers Target By Default—The samplenow Command
+Nodes where samples are being obtained at can be seen using the samplenow command for the specified
+nodes.
+   Again, by default, each node is a target, because the target is same node that the dmesg data producer
+runs on:
+L.2 Data Producers: Configuration For Running And Targeting                                         1039
+
+[basecm11->monitoring->setup]% device samplenow -t node dmesg
+Entity       Measurable    Type         Value      Age              Info
+------------ ------------ ------------ ---------- ----------        ----------
+node001      dmesg         OS           PASS       0.093s
+node002      dmesg         OS           PASS       0.087s
+node003      dmesg         OS           PASS       0.088s
+node004      dmesg         OS           PASS       0.09s
+basecm11     dmesg         OS           PASS       0.179s
+
+    In the outputs to samplenow displayed in this appendix, some columns are omitted for the sake of
+clarity.
+    The -t node option to samplenow expands to -n node001..node004,basecm11 for this reference
+cluster.
+
+
+L.2   Data Producers: Configuration For Running And Targeting
+Filters and multiplexers define which nodes run the data producers, and which nodes are the targets for
+measurables.
+    The fm.sh script introduced on page 1037 can be used to define several custom metrics according to
+what nodes run the script and what nodes are targeted by the script.
+
+L.2.1 Custom Metrics From The fm.sh Custom Script
+Custom data producers of type metric are created in this section. These data producers comprise cus-
+tom metrics, which are now set up with varying filtering and multiplexing definitions, to illustrate how
+the definitions work.
+
+The Metric all_for_self
+The metric from the data producer all_for_self can be set up with no filtering or multiplexing defined,
+as follows:
+
+[basecm11->monitoring->setup]% add metric all_for_self
+[basecm11->monitoring->setup*[all_for_self*]]% set consolidator none
+[basecm11->monitoring->setup*[all_for_self*]]% set script /cm/shared/fm.sh
+[basecm11->monitoring->setup*[all_for_self*]]% set class Test
+[basecm11->monitoring->setup*[all_for_self*]]% commit
+
+   The value for class is mandatory but arbitrary. It is an arbitrary grouping mechanism, which can be
+useful in Base View for grouping folders in trees.
+
+Sampling results for the metric all_for_self: With no filtering or multiplexing, the metric just runs
+everywhere by default, with the target of the running metric being itself too. The Info field output from
+samplenow shows this behavior in the script output:
+
+[basecm11->monitoring->setup[all_for_self]]% exit
+[basecm11->monitoring->setup]% device samplenow -t node all_for_self
+Entity       Measurable    Type Value Age       Info
+------------ ------------- ----- ------ ------ -----------------------------------
+node001      all_for_self Test 2        0.08s   Sampled on node001 for node001
+node002      all_for_self Test 13       0.084s Sampled on node002 for node002
+node003      all_for_self Test 97       0.08s   Sampled on node003 for node003
+node004      all_for_self Test 18       0.084s Sampled on node004 for node004
+basecm11     all_for_self Test 63       0.144s Sampled on basecm11 for basecm11
+1040                                              Node Execution Filters And Execution Multiplexers
+
+The Metric some_for_self
+The metric some_for_self can be set up with filtering set up for some nodes, and no multiplexing set
+up, as follows:
+
+# on node001,node002 for itself
+[basecm11->monitoring->setup]% add metric some_for_self
+[basecm11->monitoring->setup*[some_for_self*]]% set consolidator none
+[basecm11->monitoring->setup*[some_for_self*]]% set class Test
+[basecm11->monitoring->setup*[some_for_self*]]% set script /cm/shared/fm.sh
+[basecm11->...*[some_for_self*]]% nodeexecutionfilters
+[basecm11->...*[some_for_self*]->nodeexecutionfilters]% add node some_nodes
+[basecm11->...->nodeexecutionfilters*[some_nodes*]]% set nodes node001 node002
+[basecm11->...->nodeexecutionfilters*[some_nodes*]]% show
+Parameter                        Value
+-------------------------------- ------------------------------------------------
+Filter operation                 Include
+Name                             some_nodes
+Nodes                            node001,node002
+Revision
+Type                             Node
+[basecm11->...->nodeexecutionfilters*[some_nodes*]]% commit
+
+Sampling results for the metric some_for_self: Only some filtering defined, and no multiplexing
+defined at all, means that the metric just runs on the filtered nodes, and targets only the nodes defined
+in filter too:
+
+[basecm11->...->nodeexecutionfilters[some_nodes]]% ..; ..; ..
+[basecm11->monitoring->setup]% device samplenow -t node some_for_self
+Entity       Measurable     Type Value Age      Info
+------------ -------------- ----- ------ ------ -------------------------------
+node001      some_for_self Test 88       0.094s Sampled on node001 for node001
+node002      some_for_self Test 98       0.075s Sampled on node002 for node002
+
+The Metric from head_for_some_others
+The metric from_head_for_some_others can be set up with filtering defined for the head node, and
+multiplexing defined for some other regular nodes (other than node001 and node002 here), as follows:
+
+# on active head for node003,node004
+[basecm11->monitoring->setup]% add metric from_head_for_some_others
+[basecm11->monitoring->setup*[from_head_for_some_others*]]% set consolidator none
+[basecm11->monitoring->setup*[from_head_for_some_others*]]% set script /cm/shared/fm.sh
+[basecm11->monitoring->setup*[from_head_for_some_others*]]% set class Test
+[basecm11->...*[from_head_for_some_others*]]% nodeexecutionfilters
+[basecm11->...*[from_head_for_some_others*]->nodeexecutionfilters]% active
+Added active resource filter
+[basecm11->...*[from_head_for_some_others*]->nodeexecutionfilters]% show active head node
+Parameter                        Value
+-------------------------------- ------------------------------------------------
+Filter operation                 Include
+Name                             Active head node
+Operator                         OR
+Resources                        Active
+Revision
+Type                             Resource
+[basecm11->monitoring->setup*[from_head_for_some_others*]->nodeexecutionfilters]% ..
+[basecm11->...*[from_head_for_some_others*]]% executionmultiplexers
+L.3 Replacing A Resource With An Explicit Node Specification                                              1041
+
+[basecm11->...*[from_head_for_some_others*]->executionmultiplexers]% add node other_nodes
+[basecm11->..._for_some_others*]->executionmultiplexers*[other_nodes*]]% set nodes node003 node004
+[basecm11->...*[from_head_for_some_others*]->executionmultiplexers*[other_nodes*]]% show
+Parameter                        Value
+-------------------------------- ------------------------------------------------
+Filter operation                 Include
+Name                             other_nodes
+Nodes                            node003,node004
+Revision
+Type                             Node
+[basecm11->..._for_some_others*]->executionmultiplexers*[other_nodes*]]% commit; ..; ..;..
+[basecm11->monitoring->setup]%
+
+   The filter is given a resource, Active, which is a way to set the filter for the active node only. Available
+resources for a node can be seen by running the command monitoringresources for a device:
+
+Example
+
+[basecm11->monitoring->setup]% device monitoringresources basecm11
+Active
+Ethernet
+RDO
+backup
+boot
+...
+
+Sampling results for the metric from head_for_some_others: With filtering defined for the active
+head node, and multiplexing defined for those other nodes, it means that the metric targets those other
+nodes, and the metric runs on the head node. That is, the other nodes are targeted by the head node that
+is running the metric:
+
+[basecm11->monitoring->setup]% device samplenow -t node from_head_for_some_others
+Entity       Measurable                Type Value Age     Info
+------------ ------------------------- ----- ----- ----- ---------------------------------
+node003      from_head_for_some_others Test 20     0.084s Sampled on basecm11 for node003
+node004      from_head_for_some_others Test 44     0.067s Sampled on basecm11 for node004
+
+   The nodes command confirms that the head node, basecm11 is the filtered node, that is, the only
+node(s) running the metric:
+[basecm11->monitoring->setup]% nodes from_head_for_some_others
+basecm11
+
+
+L.3    Replacing A Resource With An Explicit Node Specification
+Within the filter Active head node, associated with the metric from_head_for_some_others, the re-
+source object Active can be replaced with a node object instead, if the node is defined as being basecm11.
+Doing this on a high-availability cluster where there is one active and one passive head node, would be
+unwise. However, doing this on the reference cluster for teaching purposes is of course absolutely fine
+because it helps make things a bit more concrete for the reader. The replacement can be carried out for
+the session as follows:
+
+[basecm11->monitoring->setup]% nodeexecutionfilters from_head_for_some_others
+[basecm11->...[from_head_for_some_others]->nodeexecutionfilters]% list
+Type         Name (key)               Filter                   Filter operation
+------------ ------------------------ ------------------------ ----------------
+1042                                              Node Execution Filters And Execution Multiplexers
+
+Resource     Active head node         Active                   Include
+[basecm11->...[from_head_for_some_others]->nodeexecutionfilters]% remove active head node
+[basecm11->...*[from_head_for_some_others*]->nodeexecutionfilters*]% add node head
+[basecm11->...*[from_head_for_some_others*]->nodeexecutionfilters*[head*]]% set nodes basecm11
+[basecm11->...*[from_head_for_some_others*]->nodeexecutionfilters*[head*]]% show
+Parameter                        Value
+-------------------------------- ------------------------------------------------
+Filter operation                 Include
+Name                             head
+Nodes                            basecm11
+Revision
+Type                             Node
+[basecm11->...*[from_head_for_some_others*]->nodeexecutionfilters*[head*]]% commit
+[basecm11->...[from_head_for_some_others]->nodeexecutionfilters*[head]]% ..;..;..
+
+   The sample results are the same kind of output, and the filter node used is the same. The target
+sample outputs are the same kind of output as before the replacement. The filter node on which the
+metric runs is also seen to be the same:
+
+[basecm11->monitoring->setup]% device samplenow -t node from_head_for_some_others
+Entity       Measurable                 Type Value Age     Info
+------------ -------------------------- ----- ----- ------ -----------------------------------
+node003      from_head_for_some_others Test 11      0.081s Sampled on basecm11 for node003
+node004      from_head_for_some_others Test 12      0.07s Sampled on basecm11 for node004
+[basecm11->monitoring->setup]% nodes
+basecm11
+
+
+L.4    Excessive Sampling
+If another node is appended to the node in the filter, then a warning comes up.
+
+[basecm11->monitoring->setup]% nodeexecutionfilters from_head_for_some_others
+[basecm11->...[from_head_for_some_others]->nodeexecutionfilters]% append head nodes node003
+[basecm11->...*[from_head_for_some_others*]->nodeexecutionfilters*]% commit
+========================== from_head_for_some_others ===========================
+Field                    Message
+------------------------ -------------------------------------------------------
+executionMultiplexers    Warning: Execution filters/multiplexers are set to run
+                         on multiple nodes for the same target. This likely
+                         means they are badly configured
+
+
+[basecm11->...[from_head_for_some_others]->nodeexecutionfilters]% show head
+
+Parameter                Value
+------------------------ -------------------------------------------------------
+Filter operation         Include
+Name                     head
+Nodes                    node003,basecm11
+Revision
+Type                     Node
+
+   The warning is there because the node execution filters are doing the same thing from different
+nodes for an execution multiplexer target, and duplicating monitoring execution is typically a waste of
+resources, and thus typically a mistake.
+L.5 Not Just For Nodes                                                                            1043
+
+    However, the warnings are merely warnings, and not errors. So BCM just goes ahead with set-
+ting up the filter/muliplex system according to what the administrator has specified. The nodes and
+samplingnow commands now show:
+
+[basecm11->...[from_head_for_some_others]->nodeexecutionfilters]% ..;..
+[basecm11->monitoring->setup]% device samplenow -t node from_head_for_some_others
+Entity       Measurable                 Type Value Age      Info
+------------ -------------------------- ----- ----- ------ ---------------------------------
+node003      from_head_for_some_others Test 3       0.151s Sampled on basecm11 for node003
+node003      from_head_for_some_others Test 76      0.08s   Sampled on node003 for node003
+node004      from_head_for_some_others Test 25      0.08s   Sampled on node003 for node004
+node004      from_head_for_some_others Test 88      0.151s Sampled on basecm11 for node004
+[basecm11->monitoring->setup]% nodes from_head_for_some_others
+node003,basecm11
+
+   The node node003 is now doing what the head node is, sampling the same targets, which is typically
+a bad idea. However the behavior is indeed as expected for this particular configuration.
+   Whether running a particular configuration is actually wise, is up to the administrator—but in any
+case the filter/multiplex system allows plenty of abuse of this kind.
+
+L.5   Not Just For Nodes
+Nodes are what node execution filters and execution multiplexers run on. However, sometimes it is
+more convenient to execute based on other types.
+     The possible types can be listed with tab-completion suggestions when adding a node execution
+filter or an execution multiplier:
+
+[basecm11->monitoring->setup[dmesg]->nodeexecutionfilters]% add<TAB><TAB>
+category lua        node      overlay resource type
+
+
+L.6   Lua Node Execution Filters
+Lua (https://www.lua.org/) is a lightweight scripting language embedded into CMDaemon. It allows
+more advanced node execution filters to be written using a Lua filter file.
+
+Example
+
+[basecm11->monitoring->setup[<data producer>]->nodeexecutionfilters]% add lua lua-filter
+[basecm11->...nodeexecutionfilters*[lua-filter*]]% set code <Lua filter file name>
+
+   In the preceding example session, the name lua-filter is an arbitrary name, that is added to the
+object that is associated with the Lua filter file <Lua filter file name>.
+   The self Lua table is passed by CMDaemon, and contains the entity for which the filter is evaluated.
+Only devices have a self table that is not nil. All other entities have a self table that is nil.
+   For example, a filter can be created based on a regex match of the hostname:
+
+Example
+
+if self == nil then
+  return false
+else
+  return self.hostname:match("^node[0-9]+") ~= nil)
+end
+
+   The Lua filter is evaluated for all nodes:
+
+Example
+1044                                                    Node Execution Filters And Execution Multiplexers
+
+[basecm11->monitoring->setup[dmesg]]% nodes
+node001..node004
+
+    Development of Lua filters is best done outside of CMDaemon. Doing so requires the cluster admin-
+istrator to create node environments to be evaluated by hand:
+
+Example
+
+[root@basecm11 ~]# cat node001.lua
+self = {}
+self.hostname = "node001"
+self.category = "default"
+
+[root@basecm11 ~]# cat basecm11.lua
+self = {}
+self.hostname = "basecm11"
+
+   This is in addition to the original filter script:
+
+Example
+
+[root@basecm11 ~]# cat filter.lua
+if self == nil then
+  return false
+else
+  return self.hostname:match("^node[0-9]+") ~= nil
+end
+
+   Both nodes can then be run through the filter using the lua interpreter:
+
+Example
+
+[root@basecm11 ~]# lua
+Lua 5.1.4 Copyright (C) 1994-2015 Lua.org, PUC-Rio
+> dofile('basecm11.lua')
+> print(dofile('filter.lua'))
+false
+> dofile('node001.lua')
+> print(dofile('filter.lua'))
+true
+
+   The Lua self exported by CMDaemon contains the following:
+
+   • self: The main table object, nil for non-devices.
+
+   • self.hostname: The hostname of the device.
+
+   • self.partition: The name of the partition to which the device belongs.
+
+   • self.category: The name of the category to which the compute node belongs.
+
+   • self.nodegroups: An array with the name of node groups the node belongs to.
+
+   • self.mac: The MAC address of the device.
+
+   • self.ip: The IP of the device, only available for non-node devices.
+
+   • self.network: The IP address of the device, only available for non-node devices.
+
+   • self.interfaces: The array of interface of a node.
+L.6 Lua Node Execution Filters                                                                    1045
+
+   • self.interfaces[1].name: The name of the first interface.
+
+   • self.interfaces[1].ip: The IP address of the first interface.
+
+   • self.interfaces[1].network: The name of the network of the first interface.
+
+   • self.roles: The array of roles of a node.
+
+   • self.roles[1].name: The name of the first role.
+
+   • self.roles[1].type: The type of the first role.
+
+   • self.status.status: The status of the device.
+
+   • self.status.user_message: The user message set for the device.
+
+   • self.status.info_message: The information message set for the device.
+
+   • self.status.closed: A boolean marking the node as closed.
+
+   • self.status.restart_required: A boolean marking the node needs to be rebooted.
+
+   • self.status.healthcheck_failed: A boolean marking at least one health check has returned
+     FAIL.
+   • self.status.healthcheck_unknown: A boolean marking at least one health check has returned
+     UNKNOWN.
+   • self.status.state_flapping: A boolean marking the node status transitioning often in a short
+     time span
+
+   • self.system.name: The name of the system.
+
+   • self.system.manufacturer: The manufacturer of the system.
+
+   • self.system.motherboard.name: The name of the motherboard.
+
+   • self.system.motherboard.manufacturer: The manufacturer of the motherboard.
+
+   • self.system.bios.version: The BIOS version.
+
+   • self.system.bios.vendor: The BIOS vendor name.
+
+   • self.system.bios.date: The BIOS date.
+
+   • self.system.os.name: The OS name.
+
+   • self.system.os.version: The OS version.
+
+   • self.system.os.flavor: The OS flavor.
+
+   Using the self environment, complex filters can easily be created. For example, the following filter
+can be built to include only the nodes on the IB network, which also have a Slurm client role:
+
+Example
+
+[root@basecm11 ~]# cat ib-slurm-filter.lua
+if self == nil then
+  return false
+end
+
+on_ib_network = false
+1046                                                 Node Execution Filters And Execution Multiplexers
+
+for index, interface in ipair(self.interface) do
+  on_ib_network = on_ib_network or (interface.network == "ibnet")
+done
+
+slurm_client = false
+for index, role in ipair(self.roles) do
+  slurm_client = slurm_client or (role.name == "SlurmCLient")
+done
+
+return on_ib_network and slurm_client
+
+   It is also possible to use external sources, like the file system, to determine the filter for a node.
+
+Example
+
+[root@basecm11 ~]# cat file-check-filter.lua
+if self == nil then
+  return false
+end
+
+function file_exists(name)
+  local f = io.open(name, "r")
+  if f ~= nil then
+    io.close(f)
+    return true
+  else
+    return false
+  end
+end
+
+return file_exists(string.format('/opt/filter/%s', self.hostname))
+
+   It is important to understand that this Lua script is evaluated for all nodes, on the active head node.
+The Lua script should therefore be fast, and return within a few milliseconds.
+                                                      M
+                                          A Tree View Of cmsh
+M.1    Modes
+A 3-level tree of the modes in cmsh is:
+
+|-- category
+|   |-- biossettings
+|   |-- bmcsettings
+|   |-- dpusettings
+|   | `-- keyvaluesettings
+|   |-- fsexports
+|   |-- fsmounts
+|   |-- gpusettings
+|   |-- kernelmodules
+|   |-- roles
+|   | |-- advancedsettings
+|   | |-- commsettings
+|   | |-- configs
+|   | |-- configurations
+|   | |-- connectionsettings
+|   | |-- domains
+|   | |-- engines
+|   | |-- environments
+|   | |-- excludelistsnippets
+|   | |-- genericresources
+|   | |-- interfaces
+|   | |-- logsettings
+|   | |-- momsettings
+|   | |-- nginxreverseproxy
+|   | |-- nodecustomizations
+|   | |-- openports
+|   | |-- policies
+|   | |-- powerprofiles
+|   | |-- resourceproviders
+|   | |-- routes
+|   | |-- servers
+|   | |-- spawner
+|   | |-- storagedrivers
+|   | |-- storagebackends
+|   | `-- zones
+|   |-- selinuxsettings
+|   | `-- keyvaluesettings
+|   |-- services
+1048                              A Tree View Of cmsh
+
+|   |-- staticroutes
+| `-- ztpsettings
+|-- cert
+|-- cloud
+|   |-- extensions
+|   |-- instancepools
+|   |-- ocigpumemoryclusters
+|   |-- regions
+|   |-- types
+| `-- vpcs
+|-- configurationoverlay
+|   |-- customizations
+| `-- roles
+|       |-- advancedsettings
+|       |-- commsettings
+|       |-- configs
+|       |-- configurations
+|       |-- connectionsettings
+|       |-- domains
+|       |-- engines
+|       |-- environments
+|       |-- excludelistsnippets
+|       |-- genericresources
+|       |-- interfaces
+|       |-- logsettings
+|       |-- momsettings
+|       |-- nginxreverseproxy
+|       |-- nodecustomizations
+|       |-- openports
+|       |-- policies
+|       |-- powerprofiles
+|       |-- resourceproviders
+|       |-- routes
+|       |-- servers
+|       |-- spawner
+|       |-- storagedrivers
+|       |-- storagebackends
+|       `-- zones
+|-- device
+|   |-- accesssettings
+|   |-- biosettings
+|   |-- bmcsettings
+|   |-- chassisposition
+|   |-- cloudsettings
+|   | |-- disks
+|   | |-- platformconfig
+|   | `-- storage
+|   |-- dpusettings
+|   | `-- keyvaluesettings
+|   |-- fsexports
+|   |-- fsmounts
+|   |-- gpusettings
+|   |-- interfaces
+|   |-- kernelmodules
+|   |-- nvconfiguration
+M.1 Modes                            1049
+
+|   |-- prometheusmetricforwarders
+|   |-- rackposition
+|   |-- roles
+|   | |-- advancedsettings
+|   | |-- commsettings
+|   | |-- configs
+|   | |-- configurations
+|   | |-- connectionsettings
+|   | |-- domains
+|   | |-- engines
+|   | |-- environments
+|   | |-- excludelistsnippets
+|   | |-- genericresources
+|   | |-- interfaces
+|   | |-- logsettings
+|   | |-- momsettings
+|   | |-- nginxreverseproxy
+|   | |-- nodecustomizations
+|   | |-- openports
+|   | |-- policies
+|   | |-- powerprofiles
+|   | |-- resourceproviders
+|   | |-- routes
+|   | |-- servers
+|   | |-- spawner
+|   | |-- storagedrivers
+|   | |-- storagebackends
+|   | `-- zones
+|   |-- selinuxsettings
+|   | `-- keyvaluesettings
+|   |-- services
+|   |-- snmpsettings
+|   |-- staticroutes
+| `-- ztpsettings
+|       `-- keyvaluesettings
+|-- edgesite
+|-- etcd
+|-- fspart
+| `-- excludelistsnippets
+|-- group
+|-- hierarchy
+|   |-- sources
+| `-- targets
+|-- kubernetes
+|   |-- appgroups
+|   | `-- applications
+|   |-- labelsets
+| `-- users
+|-- main
+|-- monitoring
+|   |-- action
+|   |-- consolidator
+|   | `-- consolidators
+|   |-- labeledentity
+|   |-- measurable
+1050                                   A Tree View Of cmsh
+
+|   |-- query
+|   | `-- drilldown
+|   |-- report
+|   |-- setup
+|   | |-- dpusettings
+|   | |-- executionmultiplexers
+|   | |-- jobmetricsettings
+|   | `-- nodeexecutionfilters
+|   |-- standalone
+| `-- trigger
+|       `-- expression
+|-- network
+|-- nodegroup
+|-- partition
+|   |-- accesssettings
+|   |-- archos
+|   |-- bmcsettings
+|   |-- burnconfigs
+|   |-- dpusettings
+|   | `-- keyvaluesettings
+|   |-- failover
+|   |-- failovergroups
+|   |-- leakactionpolicies
+|   | `-- rules
+|   |-- netqsettings
+|   | `-- prometheusmetricforwarders
+|   |-- nmxmsettings
+|   | `-- prometheusmetricforwarders
+|   |-- prometheusmetricforwarders
+|   |-- provisioningsettings
+|   |-- resourcepools
+|   |-- selinuxsettings
+|   | `-- keyvaluesettings
+|   |-- snmpsettings
+|   |-- ufmsettings
+|   | `-- prometheusmetricforwarders
+|   |-- wlmjobpowerusagesettings
+|   |-- ztpnewswitchsettings
+|   | `-- keyvaluesettings
+| `-- ztpsettings
+|       `-- keyvaluesettings
+|-- powercircuit
+|-- process
+|-- profile
+|-- rack
+|-- session
+|-- softwareimage
+|   |-- kernelmodules
+| `-- selection
+|-- task
+|-- user
+| `-- projectmanager
+`-- wlm
+    |-- accounting
+    |-- cgroups
+M.1 Modes                      1051
+
+   |-- chargeback
+   |-- jobqueue
+   |-- jobs
+   |-- licenses
+   |-- ocisettings
+   |-- pelogs
+   |-- placeholders
+   |-- prssettings
+   `-- topologysettings
+       |-- blocksettings
+       |-- parameters
+       |-- topographsettings
+       `-- treesettings
+                                                                                     N
+                                  BCM And NVIDIA AI
+                                           Enterprise
+Some features of BCM are certified for NVIDIA AI Enterprise (https://docs.nvidia.com/ai-enterprise/
+index.html).
+
+N.0.1 Certified Features Of BCM For NVIDIA AI Enterprise
+The BCM Feature Matrix at:
+   https://support.brightcomputing.com/feature-matrix/
+   has a complete list of the features of BCM that are certified for NVIDIA AI Enterprise.
+
+N.0.2 NVIDIA AI Enterprise Compatible Servers
+BCM must be deployed on NVIDIA AI Enterprise compatible servers.
+   The NVIDIA Qualified System Catalog at:
+   https://www.nvidia.com/en-us/data-center/data-center-gpus/qualified-system-catalog/
+    displays a complete list of NVIDIA AI Enterprise compatible servers if the NVAIE Compatible option
+is selected.
+
+N.0.3 NVIDIA Software Versions Supported
+NVIDIA AI Enterprise supports specific versions of NVIDIA software, including
+
+   • NVIDIA drivers
+
+   • NVIDIA containers
+
+   • the NVIDIA Container Toolkit
+
+   • the NVIDIA GPU Operator
+
+   • the NVIDIA Network Operator
+
+The NVIDIA AI Enterprise Catalog On NGC at:
+   https://catalog.ngc.nvidia.com/enterprise
+   lists the specific versions of software included in a release.
+
+N.0.4 NVIDIA AI Enterprise Product Support Matrix
+The NVIDIA AI Enterprise Product Support Matrix at:
+   https://docs.nvidia.com/ai-enterprise/latest/product-support-matrix/index.html
+   lists the platforms that are supported.
+

@@ -1,0 +1,1384 @@
+                                                                                       12
+                Chapter 12 - Monitoring: Job Accounting
+12.1    Introduction
+In addition to the concept of metrics for devices (Chapter 10), or the concept of metrics for jobs (Chap-
+ter 11), there is also the concept of metrics gathered for a classifier entity, for resources used during jobs.
+This last one is typically metrics gathered per user, for resources used during jobs.
+     Classifier-based metrics gathering for jobs can use classification done with PromQL queries on la-
+beled entities (sections 12.2- 12.8), or it can be done with CMDaemon database queries (section 12.9).
+     Classifier-based metrics gathering for jobs is more conveniently called job accounting, partly because
+it ressembles the idea of an accountant watching over users to track their resource use while they carry
+out their jobs.
+     The concept, implementation, analysis, and visualization of job accounting are described in this
+Chapter.
+     For example, in BCM jobs resource usage can be presented per user. Thus, if there are jobs in a queue
+that are being processed, then the jobs can be listed:
+
+Example
+
+[basecm11->wlm[slurm]->jobs]% list | head
+Type         Job ID       User Queue      Running time Status    Nodes
+------------ ------------ ------ ------- ------------ ---------- -------------------
+Slurm        1325         tim    defq    1m 2s         COMPLETED node001..node003
+Slurm        1326         tim    defq    1m 1s         COMPLETED node001..node003
+Slurm        1327         tim    defq    1m 2s         COMPLETED node001..node003
+Slurm        1328         tim    defq    32s           RUNNING   node001..node003
+Slurm        1329         tim    defq    0s            PENDING
+
+   The resource usage statistics gathered per user, for example for a user tim, can then be analyzed and
+visualized using the job accounting interface of Base View (section 12.5).
+
+
+12.2    Labeled Entities
+In job accounting, job metrics during a run are tagged with extra labels, such as the job ID, host name,
+and the user running the job. The modified job metrics object that is tagged in this way then becomes a
+job accounting-related object, called a labeled entity.
+    Administrators interested in using job accounting can simply skip ahead and start reading about the
+Base View job accounting interface in 12.5, and just explore it directly. Those who would prefer some
+background on how job accounting is integrated with BCM and PromQL, can continue reading this
+section (12.2) and the next one ( 12.3).
+670                                                                      Monitoring: Job Accounting
+
+12.2.1 Dataproducers For Labeled Entities
+To view labeled entities in cmsh, the path to the labeledentity submode is:
+   cmsh > monitoring > labeledentity
+   The labeledentity submode allows job accounting-related objects, called labeled entities, to be
+viewed. The labels are in the form <key>="<value>", for example: hostname="node001", or user="alice".
+   The default, existing labeled entities are created from the built-in JobSampler and
+JobMetadataSampler dataproducers when a job is run. Custom samplers, of type prometheus,
+can be used to create further custom labeled entities. A custom sampler dataproducer, for example
+customsamplerextras, can be created from the monitoring setup mode of cmsh as follows:
+
+Example
+
+[basecm11]% monitoring setup
+[basecm11->monitoring->setup]% add prometheus customsamplerextras
+[basecm11->monitoring->setup*[customsamplerextras*]]%
+
+   The customsamplerextras dataproducer can now have its properties configured and committed as
+described in section 10.5.4.
+
+12.2.2 PromQL And Labeled Entities
+Labeled entities can be used by administrators to help create and debug job-related queries in the
+Prometheus query language, PromQL. PromQL is a part of the Prometheus monitoring and alerting
+toolkit (https://prometheus.io). Basic PromQL documentation is available at https://prometheus.
+io/docs/prometheus/latest/querying/basics/.
+
+12.2.3 Job IDs And Labeled Entities
+Each job ID has a number of labeled entities associated with it. Since the number of labeled entities
+scales with the number of nodes and jobs, the number of labeled entities can be very large. Therefore,
+if examining these entities using the CMDaemon front ends such as cmsh or Base View, then filtering
+or sorting the output is useful. For example, labeled entities associated with node001, and with the
+JobSampler data producer, and with job 1329 from the preceding output, could be viewed by filtering
+the full list of labeled entities as follows (output truncated and ellipsized):
+
+Example
+
+[basecm11->monitoring->labeledentity]% list|head -2; list|grep 'job_id="1329"' |grep node001 |grep JobSampler
+Index Name (key)                                                                             ...
+------ --------------------------------------------------------------------------------------...
+45446 hostname="node001",job="JobSampler",job_id="1329",wlm="slurm"                          ...
+45447 device="vda",hostname="node001",job="JobSampler",job_id="1329",wlm="slurm"             ...
+45448 device="vda",hostname="node001",job="JobSampler",job_id="1329",mode="read",wlm="slurm"...
+...
+
+12.2.4 Measurables And Labeled Entities
+The measurables (metrics) for an entity can be listed with the measurables (or metrics) command. For
+a particular entity with a JobSampler property and index value of 45447, the command can be run as
+follows:
+
+[basecm11->monitoring->labeledentity]% measurables 45447
+Type    Name                               Parameter      Class       Producer
+------- ---------------------------------- -------------- ----------- --------------
+Metric job_blkio_sectors                                  Prometheus JobSampler
+Metric job_blkio_time_seconds                             Prometheus JobSampler
+[basecm11->monitoring->labeledentity]%
+12.3 PromQL Queries                                                                            671
+
+    In the labeledentity mode of cmsh, the measurables listing command, which lists the measurables
+for labeled entities, should not be confused with the measurable navigation command, which brings
+the administrator to the measurable submode under the main monitoring mode.
+
+
+12.3   PromQL Queries
+12.3.1 The Default PromQL Queries...
+By default there are several predefined PromQL queries already available. The queries can be listed
+from the query submode:
+
+Example
+
+[basecm11->monitoring->query]% list
+Name (key)                                                  Start time End time Interval Class
+----------------------------------------------------------- ---------- -------- -------- ------------------
+account_job_effective_cpu_seconds                            now                 0s       accounting
+account_job_io_bytes                                         now                 0s       accounting
+account_job_memory_usage_bytes                               now                 0s       accounting
+account_job_running_count                                    now                 0s       accounting
+account_job_waiting_seconds                                  now                 0s       accounting
+account_job_wall_clock_seconds                               now                 0s       accounting
+account_job_wasted_cpu_seconds                               now                 0s       accounting
+accounts_usage_gpu                                           now                 0s       accounting
+accounts_used_gpu                                            now                 0s       accounting
+accounts_wasted_memory                                       now                 0s       accounting
+cluster_cpu_usage_percent                                    now-1d     now      15m      cluster
+container_memory_usage_bytes                                 now-1d     now      1h       container
+container_network_received_bytes                             now-1d     now      1h       container
+container_total_cpu_usage_secs                               now-1d     now      1h       container
+container_total_fs_usage_bytes                               now-1d     now      1h       container
+cpu_usage_by_cluster                                         now-1d     now      1h       kubernetes
+cpu_usage_by_deployment                                      now-1d     now      1h       kubernetes
+cpu_usage_by_namespace                                       now-1d     now      1h       kubernetes
+fs_usage_by_cluster                                          now-1d     now      1h       kubernetes
+fs_usage_by_deployment                                       now-1d     now      1h       kubernetes
+fs_usage_by_namespace                                        now-1d     now      1h       kubernetes
+groups_job_allocated_nodes                                   now-1d     now      15m      jobs
+groups_job_cpu_usage                                         now-1d     now      15m      jobs
+groups_job_io_bytes_per_second                               now-1d     now      15m      jobs
+groups_job_memory_bytes                                      now-1d     now      15m      jobs
+groups_job_waiting                                           now-1d     now      15m      jobs
+groups_usage_gpu                                             now                 0s       accounting
+groups_used_gpu                                              now                 0s       accounting
+job_effective_cpu_seconds_job_name_for_user                  now                 0s       accounting/level/1
+job_information_by_account                                   now                 0s       drilldown/level/0
+job_information_by_job_id_for_account_and_user_and_job_name now                  0s       drilldown/level/3
+job_information_by_job_id_for_user                           now                 0s       drilldown/level/1
+job_information_by_job_id_for_user_and_job_name              now                 0s       drilldown/level/2
+job_information_by_job_name_for_account                      now                 0s       drilldown/level/1
+job_information_by_job_name_for_account_and_user             now                 0s       drilldown/level/2
+job_information_by_job_name_for_user                         now                 0s       drilldown/level/1
+job_information_by_user                                      now                 0s       drilldown/level/0
+job_information_by_user_for_account                          now                 0s       drilldown/level/1
+job_information_by_user_for_account_and_job_name             now                 0s       drilldown/level/2
+job_io_bytes_per_job_name_for_user                           now                 0s       accounting/level/1
+job_memory_usage_bytes_per_job_name_for_user                 now                 0s       accounting/level/1
+672                                                                          Monitoring: Job Accounting
+
+job_names_job_allocated_nodes                                       now-1d      now       15m     jobs
+job_names_job_cpu_usage                                             now-1d      now       15m     jobs
+job_names_job_io_bytes_per_second                                   now-1d      now       15m     jobs
+job_names_job_memory_bytes                                          now-1d      now       15m     jobs
+job_names_job_waiting                                               now-1d      now       15m     jobs
+job_names_usage_gpu                                                 now                   0s      accounting
+job_names_used_gpu                                                  now                   0s      accounting
+job_running_count_job_name_for_user                                 now                   0s      accounting/level/1
+job_waiting_seconds_job_name_for_user                               now                   0s      accounting/level/1
+job_wall_clock_seconds_job_name_for_user                            now                   0s      accounting/level/1
+job_wasted_cpu_seconds_job_name_for_user                            now                   0s      accounting/level/1
+jobs_wasted_allocated_gpus                                          now                   0s      accounting
+memory_usage_by_cluster                                             now-1d      now       1h      kubernetes
+memory_usage_by_deployment                                          now-1d      now       1h      kubernetes
+memory_usage_by_namespace                                           now-1d      now       1h      kubernetes
+net_usage_by_cluster                                                now-1d      now       1h      kubernetes
+net_usage_by_deployment                                             now-1d      now       1h      kubernetes
+net_usage_by_namespace                                              now-1d      now       1h      kubernetes
+unused_gpu_job_name_for_user                                        now                   0s      accounting/level/1
+used_gpu_job_name_for_user                                          now                   0s      accounting/level/1
+users_job_allocated_nodes                                           now-1d      now       15m     jobs
+users_job_cpu_usage                                                 now-1d      now       15m     jobs
+users_job_effective_cpu_seconds                                     now                   0s      accounting
+users_job_io_bytes                                                  now                   0s      accounting
+users_job_io_bytes_per_second                                       now-1d      now       15m     jobs
+users_job_memory_bytes                                              now-1d      now       15m     jobs
+users_job_memory_usage_bytes                                        now                   0s      accounting
+users_job_running_count                                             now                   0s      accounting
+users_job_waiting                                                   now-1d      now       15m     jobs
+users_job_waiting_seconds                                           now                   0s      accounting
+users_job_wall_clock_seconds                                        now                   0s      accounting
+users_job_wasted_cpu_seconds                                        now                   0s      accounting
+users_unused_gpu                                                    now                   0s      accounting
+users_usage_gpu                                                     now                   0s      accounting
+users_used_gpu                                                      now                   0s      accounting
+users_wasted_allocated_gpus                                         now                   0s      accounting
+users_wasted_memory                                                 now                   0s      accounting
+wasted_allocated_gpus_for_user                                      now                   0s      accounting/level/1
+wasted_memory_job_name_for_account                                  now                   0s      accounting/level/1
+wasted_memory_job_name_for_user                                     now                   0s      accounting/level/1
+
+    The queries can be conceptually divided into their classes, which at the time of writing (May 2023)
+are: accounting, cluster, container, jobs, kubernetes, along with various drilldown levels which
+classifies the queries according to various groups. The grouping for drilldown levels can be confusing,
+and the drilldownoverview command (section 12.8.1) can be helfpul in clarifying the query intention
+for these.
+    By default, queries of all classes are sampled over a period, except for the accounting and drilldown
+metrics.
+    A metric in the accounting class query is evaluated (interpolated) from existing values. These exist-
+ing values are raw samples gathered over the period, up to the time when the query is evaluated.
+
+12.3.2 ...And A Short Description Of Them
+The description of each query can be listed with a little cmsh and unix text utility juggling:
+
+Example
+12.3 PromQL Queries                                                                                 673
+
+[basecm11->monitoring->query]% foreach * (get name; get description) | paste - - | expand -t 60
+
+   This yields the following table:
+                                      Table 12.3: PromQL Query Descriptions
+ Name                                                 Description
+ account_job_effective_cpu_seconds                    CPU seconds effectively used by account for the last pe-
+                                                      riod
+ account_job_io_bytes                                 Total I/O by account during the last period in Bytes
+ account_job_memory_usage_bytes                       Total memory usage by account during the last period in
+                                                      Byte seconds
+ account_job_running_count                            Number of jobs running by account during the last period
+ account_job_waiting_seconds                          Total waiting time for account jobs in seconds during the
+                                                      last period
+ account_job_wall_clock_seconds                       Wall clock time used by account for the last period
+ account_job_wasted_cpu_seconds                       CPU seconds allocated but not used by account for the last
+                                                      period
+ accounts_usage_gpu                                   Total used GPU time grouped by account for the specified
+                                                      period
+ accounts_used_gpu                                    Used GPUs, for values of use greater than or equal to 0.1%,
+                                                      averaged and grouped by account using them in the spec-
+                                                      ified period
+ accounts_wasted_memory                               The sum of the minimal wasted memory over all nodes
+                                                      per account for the last period
+ cluster_cpu_usage_percent                            CPU usage percentage over all nodes up
+ container_memory_usage_bytes                         Containers’ memory usage in bytes
+ container_network_received_bytes                     Containers’ total Received bytes
+ container_total_cpu_usage_secs                       Containers’ total CPU Usage in seconds
+ container_total_fs_usage_bytes                       Containers’ total filesystem usage in bytes
+ cpu_usage_by_cluster                                 CPU usage by cluster in nr. of cores
+ cpu_usage_by_deployment                              CPU usage by deployment in nr. of cores
+ cpu_usage_by_namespace                               CPU usage by namespace in nr. of cores
+ fs_usage_by_cluster                                  Current FS I/O by cluster in Bytes
+ fs_usage_by_deployment                               Current FS I/O by deployment in Bytes
+ fs_usage_by_namespace                                Current FS I/O by namespace in Bytes
+                                                                                                          ...continues
+674                                                                        Monitoring: Job Accounting
+
+                                  Table 12.3: PromQL Query Descriptions...continued
+ Name                                                   Description
+ groups_job_allocated_nodes                             Number of nodes allocated by groups
+ groups_job_cpu_usage                                   Effective CPU usage by groups
+ groups_job_io_bytes_per_second                         Current I/O for group jobs in B/s
+ groups_job_memory_bytes                                Current memory consumption for group jobs in Bytes
+ groups_job_waiting                                     Number of jobs currently waiting for every group
+ groups_usage_gpu                                       Total used GPU time grouped by group for the specified
+                                                        period
+ groups_used_gpu                                        Used GPUs, for values of use greater than or equal to 0.1%,
+                                                        averaged and grouped by groups using them in the speci-
+                                                        fied perio
+ job_effective_cpu_seconds_job_name_for_user            CPU seconds effectively used by by job_name for a user for
+                                                        the last period
+ job_information_by_account                             Generic job information drill down query grouped by ac-
+                                                        count
+ job_information_by_job_id_for_account_and_user         Generic job information drill down query grouped by wlm
+                              _and_job_name             and job_id for a specific account, user and job_name
+ job_information_by_job_id_for_user                     Generic job information drill down query grouped by wlm
+                                                        and job_id for a specific user
+ job_information_by_job_id_for_user_and_job_name        Generic job information drill down query grouped by wlm
+                                                        and job_id for a specific user and job_name
+ job_information_by_job_name_for_account                Generic job information drill down query grouped by
+                                                        job_name for a specific account
+ job_information_by_job_name_for_account_and_user       Generic job information drill down query grouped by
+                                                        job_name for a specific account and user
+ job_information_by_job_name_for_user                   Generic job information drill down query grouped by
+                                                        job_name for a specific user
+ job_information_by_user                                Generic job information drill down query grouped by user
+ job_information_by_user_for_account                    Generic job information drill down query grouped by user
+                                                        for a specific account
+ job_information_by_user_for_account_and_job_name       Generic job information drill down query grouped by user
+                                                        for a specific account and job_name
+ job_io_bytes_per_job_name_for_user                     Total I/O by job_name for a user during the last period in
+                                                        Bytes
+ job_memory_usage_bytes_per_job_name_for_user           Total memory usage by job_name for a user during the last
+                                                        period in Byte seconds
+                                                                                                        ...continues
+12.3 PromQL Queries                                                                                 675
+
+                                 Table 12.3: PromQL Query Descriptions...continued
+ Name                                                  Description
+ job_names_job_allocated_nodes                         Number of nodes allocated by job name
+ job_names_job_cpu_usage                               Effective CPU usage by job name
+ job_names_job_io_bytes_per_second                     Current I/O for jobs in B/s
+ job_names_job_memory_bytes                            Current memory consumption for jobs in Bytes
+ job_names_job_waiting                                 Number of jobs currently waiting for every job_name
+ job_names_usage_gpu                                   Total used GPU time grouped by job name for the specified
+                                                       period
+ job_names_used_gpu                                    Used GPUs, for values of use greater than or equal to 0.1%,
+                                                       averaged and grouped by job name using them in the spec-
+                                                       ified period
+ job_running_count_job_name_for_user                   Number of jobs running by job_name for a user during the
+                                                       last period
+ job_waiting_seconds_job_name_for_user                 Total waiting time for jobs by job_name for a user in sec-
+                                                       onds during the last period
+ job_wall_clock_seconds_job_name_for_user              Wall clock time used by job_name for a user for the last pe-
+                                                       riod
+ job_wasted_cpu_seconds_job_name_for_user              CPU seconds allocated but not used by job_name for a user
+                                                       for the last period
+ jobs_wasted_allocated_gpus                            Average % of allocated GPUs wasted for jobs that ran in
+                                                       the specified period, averaged and grouped by job_id
+ memory_usage_by_cluster                               Total memory usage by cluster during the last week in
+                                                       Bytes per second
+ memory_usage_by_deployment                            Total memory usage by deployment during the last week
+                                                       in Bytes per second
+ memory_usage_by_namespace                             Total memory usage by namespace during the last week in
+                                                       Bytes per second
+ net_usage_by_cluster                                  Network usage by cluster in Bytes per second
+ net_usage_by_deployment                               Network usage by deployment in Bytes per second
+ net_usage_by_namespace                                Network usage by namespace in Bytes per second
+ unused_gpu_job_name_for_user                          Unused GPUs, for values of use less than 0.1%, averaged
+                                                       and grouped by job names using them in the specified pe-
+                                                       riod, for a particular user
+ used_gpu_job_name_for_user                            Used GPUs, for values of use greater than or equal to 0.1%,
+                                                       averaged and grouped by job names that ran on them in
+                                                       the specified period, for a particular user
+                                                                                                          ...continues
+676                                                                        Monitoring: Job Accounting
+
+                                  Table 12.3: PromQL Query Descriptions...continued
+ Name                                                   Description
+ users_job_allocated_nodes                              Number of nodes allocated by users
+ users_job_cpu_usage                                    Effective CPU usage by users
+ users_job_effective_cpu_seconds                        CPU seconds effectively used by users for the last period
+ users_job_io_bytes                                     Total I/O by users during the last period in Bytes
+ users_job_io_bytes_per_second                          Current I/O for user jobs in B/s
+ users_job_memory_bytes                                 Current memory consumption for user jobs in Bytes
+ users_job_memory_usage_bytes                           Total memory usage by users during the last period in Byte
+                                                        seconds
+ users_job_running_count                                Number of jobs running by users during the last period
+ users_job_waiting                                      Number of jobs currently waiting for every user
+ users_job_waiting_seconds                              Total waiting time for users jobs in seconds during the last
+                                                        period
+ users_job_wall_clock_seconds                           Wall clock time used by users for the last period
+ users_job_wasted_cpu_seconds                           CPU seconds allocated but not used by users for the last
+                                                        period
+ users_unused_gpu                                       Unused GPUs, for values of use less than 0.1%, averaged
+                                                        and grouped by users using them in the specified period
+ users_usage_gpu                                        Total used GPU time grouped by user for the specified pe-
+                                                        riod
+ users_used_gpu                                         Used GPUs, for values of use greater than or equal to 0.1%,
+                                                        averaged and grouped by users using them in the speci-
+                                                        fied period
+ users_wasted_allocated_gpus                            Average % of allocated GPUs wasted for jobs that ran in
+                                                        the specified period, averaged and grouped by user
+ users_wasted_memory                                    The sum of the minimal wasted memory over all nodes
+                                                        per user for the last period
+ wasted_allocated_gpus_for_user                         Average % of allocated GPUs wasted for jobs that ran in
+                                                        the specified period, averaged and grouped by job_id, for
+                                                        a particular user
+ wasted_memory_job_name_for_account                     The sum of the minimal wasted memory over all nodes by
+                                                        job_name for a account for the last period
+ wasted_memory_job_name_for_user                        The sum of the minimal wasted memory over all nodes by
+                                                        job_name for a user for the last period
+
+
+    The listings give an idea of what the query does.
+    For example, for the users_job_cpu_usage utility, the idea is that it shows the CPU usage for jobs
+for each user.
+
+12.3.3 Modifying The Default PromQL Query Properties
+The properties of a particular query can be shown and modified:
+
+Example
+
+[basecm11->monitoring->query]% use users_job_cpu_usage
+[basecm11->monitoring->query[users_job_cpu_usage]]% show
+Parameter                        Value
+12.3 PromQL Queries                                                                                  677
+
+-------------------------------- ------------------------------------------------
+Name                             users_job_cpu_usage
+Revision
+Class                            jobs
+Alias
+Start time                       now-1d
+End time                         now
+Interval                         15m
+Description                      Effective CPU usage by users
+PromQL Query                     <136B>
+Access                           Public
+Unit                             CPU
+Price                            0.000000
+Currency                         $
+Preference                       0
+Drill down                       <0 in submode>
+Notes                            <0B>
+
+   The PromQL query code itself is typically a few lines long, and can also be viewed and modified
+using get, and set.
+
+12.3.4 An Example PromQL Query, Properties, And Disassembly
+The users_job_cpu_usage query is a standard predefined query, and is used as an example here. The
+query shows the CPU usage by a user around the time the sample was taken. It is sometimes called an
+“instantaneous” value. However it is not that instantaneous, because its value is calculated by taking
+samples of the CPU usage over the last 10 minutes of the job run rather than at the query time. The code
+for the query can be viewed with:
+Example
+[basecm11->monitoring->query]% get users_job_cpu_usage promqlquery
+sum by(user) (
+  irate(job_cpuacct_usage_seconds[10m])
+    * on(wlm, job_id, hostname) group_right()
+  (job_metadata_is_running)
+)
+
+   For those unfamiliar with PromQL, some disassembly of the users_job_cpu_usage query is helpful.
+   Terminology used by PromQL and BCM, for the pieces used to build the query, is listed in the fol-
+lowing table:
+    PromQL Terminology        Example                                   BCM Terminology
+    Query                     users_job_cpu_usage                       PromQL query
+    Instant query             job_cpuacct_usage_seconds                 Metric (from JobSampler datapro-
+                                                                        ducer, belonging to the Prometheus
+                                                                        class)
+    Range vector              job_cpuacct_usage_seconds[10m]            Metric samples over a time span
+
+
+    As was mentioned before: job account metrics, unlike traditional metrics, are not directly associated
+with the device-related objects. For such metrics, the monitoring data command dumpmonitoringdata
+is therefore not accessed in cmsh from device mode or category mode.
+    Instead, the Prometheus metric job_cpuacct_usage_seconds, for example, is accessed via the
+labeledentities mode.
+    The properties and interpolated values at a particular instant of time for the metric can be accessed
+via an instantquery such as (some output excised for clarity):
+678                                                                         Monitoring: Job Accounting
+
+Example
+
+[basecm11->monitoring->labeledentity]% instantquery job_cpuacct_usage_seconds
+Name                       hostname job         job_id user wlm Timestamp Value
+-------------------------- -------- ----------- ------- ----- ----- --------- -----
+job_cpuacct_usage_seconds node001 JobSampler 623        tony slurm 15:52:15 129
+job_cpuacct_usage_seconds node002 JobSampler 624        tony slurm 15:52:15 71
+...
+
+   The properties and interpolated values of the metric over a range of time can be accessed via a
+rangequery such as (some output excised for clarity):
+
+Example
+
+[basecm11->monitoring->labeledentity]% rangequery --start now-2h --end now job_cpuacct_usage_seconds
+Name                       hostname job         job_id user wlm Timestamp Value
+-------------------------- -------- ----------- ------- ----- ----- --------- -----
+job_cpuacct_usage_seconds node001 JobSampler 623        tony slurm 13:52:15 82
+job_cpuacct_usage_seconds node001 JobSampler 623        tony slurm 14:52:15 97
+job_cpuacct_usage_seconds node001 JobSampler 623        tony slurm 15:52:15 129
+job_cpuacct_usage_seconds node002 JobSampler 624        tony slurm 13:52:15 46
+job_cpuacct_usage_seconds node002 JobSampler 624        tony slurm 14:52:15 23
+...
+
+   The association of the instantquery and rangequery output with job accounts is because its dat-
+aproducer is JobSampler.
+   Further options for the instantquery and rangequery commands can be found in their help texts
+within cmsh.
+
+12.3.5 Aside: Getting Raw Values For A Prometheus Class Metric
+The PromQL language is aimed at providing an overall view of jobs and resource usage. The actual
+individual raw values that Prometheus metrics are built on—the entries in the Time Series Database
+(TSDB)—are not regarded as being important for the end user. The emphasis in PromQL is on seeing
+the values as seen by statistical reworking.
+   This section, which is about the raw TSDB values, is thus provided as background information for
+administrators who would anyway like to see what the raw values look like.
+   Raw values of the metric for a job ID can be accessed by using the index of the labeled identity that is
+associated with that job ID. For example, job ID 624 can have its index found with some grepping (some
+output elided or excised for clarity):
+
+Example
+
+[basecm11->monitoring->labeledentity]% list|head -2; list|grep ' hostname='| grep 'job_id="624"'
+Index Name (key)                                              Introduction Last used
+------ ----------------------------------------------------- ------------ ---------
+4060   hostname="node001",job="JobSampler",job_id="624", ... 13:30:03      16:00:03
+[basecm11->monitoring->labeledentity]%
+
+    The index for the job ID 624 is 4060. The job ID can be used by the dumpmonitoringdata command
+to show the series raw values along with their time stamps:
+
+Example
+
+[basecm11->monitoring->labeledentity]% dumpmonitoringdata -24h now job_cpuacct_usage_seconds 4060
+Timestamp                  Value      Info
+-------------------------- ---------- ----------
+12.3 PromQL Queries                                                                                    679
+
+2019/08/01 16:08:03.255    10s
+2019/08/01 16:10:03.255    2m 10s
+2019/08/01 16:12:03.255    4m 9s
+2019/08/01 16:14:03.255    6m 9s
+2019/08/01 16:16:03.255    8m 8s
+2019/08/01 16:18:03.255    10m 8s
+2019/08/01 16:20:03.255    12m 7s
+2019/08/01 16:22:03.255    14m 6s
+2019/08/01 16:24:03.255    16m 6s
+2019/08/01 16:26:03.255    18m 5s
+2019/08/01 16:28:03.255    20m 5s
+2019/08/01 16:30:03.255    no data
+[basecm11->monitoring->labeledentity]%
+
+   These raw values are the values that are used for interpolation during PromQL queries.
+   The label names for job samples can be seen using the index:
+
+[basecm11->monitoring->labeledentity]% show 4060
+Parameter         Value
+----------------- ------------------------------------------------------------------------------------
+Index             4060
+Introduction      Thu, 01 Aug 2019 16:08:03 CEST
+Last used         Thu, 01 Aug 2019 16:30:03 CEST
+Name              hostname="node001",job="JobSampler",job_id="624",uid="1002",user="tony",wlm="slurm"
+Permanent         no
+Revision
+
+
+
+12.3.6 ...An Example PromQL Query, Properties, And Disassembly (Continued)
+Getting back from the aside about raw values, and continuing on with the example PromQL query from
+the start of this section (page 677), the query code for the query users_job_cpu_usage was:
+
+sum by(user) (
+  irate(job_cpuacct_usage_seconds[10m])
+    * on(wlm, job_id, hostname) group_right()
+  (job_metadata_is_running)
+)
+
+   With the necessary background explanations having been carried out, the disassembly of this query
+can now be done:
+   The core of the query is built around the job sampler metric job_cpuacct_usage_seconds.
+   The irate measurement in this case calculates the rate of change based on the last two most recent
+values in the Prometheus range vector.
+   The Prometheus range vector is formed from the Prometheus instant query by using the square
+brackets with a time value enclosed (job_cpuacct_usage_seconds[10m]). The Prometheus instant
+query is, as the terminology table earlier pointed out, the Prometheus version of the job sampler metric.
+   Getting back to the range vector, a range vector in general is a series of values formed from the
+corresponding Prometheus instant query. With the instant query being job_cpuacct_usage_seconds
+here, the range vector is formed over a span of 10 minutes.
+   After the irate function has taken the average, the resultant is what in PromQL is called an in-
+stant vector value. This consists of data in the form {CPU seconds consumed during period, timestamp
+associated with time period sample}. The instant vector value is then joined against each vector ele-
+ment of the pair job_id, hostname to generate the labeled identifier for the job running on the node. The
+group_right of the result uses the wlm, job_id and hostname as the leading labels in the label identifiers.
+680                                                                          Monitoring: Job Accounting
+
+The job_metadata_is_running function means that values are generated only while job_metadata is
+running. The sum by(user) function means that the metric is aggregated over all raw data and grouped
+by user.
+   Visualisation based on the result is most easily carried out by plotting job CPU usage for each user
+against time in the period specified, which can be done in a more user-friendly way with Base View.
+   The users_job_wall_clock_seconds query, is similar, and can be used to plot wall clock seconds
+consumed by a user over the last period:
+Example
+[basecm11->monitoring->query]% get users_job_wall_clock_seconds promqlquery
+sum by(user) (
+  max_over_time(job_metadata_running_seconds[$period])
+    * on(wlm, job_id) group_right()
+  max_over_time(job_metadata_num_cpus[$period])
+)
+[basecm11->monitoring->query]%
+
+      Predefined queries can be executed in the labeledentity mode with the -q option:
+[basecm11->monitoring->labeledentity]% instantquery -q users_job_wall_clock_seconds
+# using default parameter: period=1w
+Name                          user     Timestamp                 Value               Unit
+----------------------------- -------- ------------------------- ------------------- --------
+users_job_wall_clock_seconds alice     Fri Feb 10 16:05:01 2023 17896.886001110077 s
+users_job_wall_clock_seconds bob       Fri Feb 10 16:05:01 2023 20670.46400117874 s
+users_job_wall_clock_seconds charlie Fri Feb 10 16:05:01 2023 10947.136002540588 s
+
+   If no period is specified with the -p|--parameter option, then the default period is 1w as the output
+indicates.
+   If Base View is used instead of cmsh, then Prometheus queries can be selected via the navigation
+path:
+   Menu bar > Accounting and reporting icon > Monitoring > PromQL Queries > Show/Hide query selection
+
+    For example the users_job_wall_clock_seconds query can be selected, its query parameter can be
+set to 1 week, the change saved, and the query run.
+
+
+12.4      Parameterized PromQL Queries
+It is also possible to create parameterized queries using the <key>="<value>" labels in the labeled entities
+mode.
+     This is handy for running the same query with different parameters or other drilldown options.
+     For example, an existing unparameterized query
+      users_job_wall_clock_seconds
+can be used as a starting point:
+[basecm11->monitoring->query]% get users_job_wall_clock_seconds promqlquery
+sum by(user) (
+  max_over_time(job_metadata_running_seconds[$period])
+    * on(wlm, job_id) group_right()
+  max_over_time(job_metadata_num_cpus[$period])
+)
+
+    For convenience, the original query can be cloned over to a new, soon-to-be-parameterized, query
+called
+      users_job_wall_clock_per_account_seconds
+using
+12.4 Parameterized PromQL Queries                                                             681
+
+[basecm11->monitoring->query]% clone users_job_wall_clock_seconds users_job_wall_clock_per_account_seconds
+
+   The idea is that Slurm accounts become a parameter in the new query.
+   Parameter     fields   can    now    be    added    to    the   query.  All    fields in
+users_job_wall_clock_per_account_seconds can be replaced verbatim. So any part of the query
+can be made into a parameter.
+
+[basecm11->monitoring->query]% get users_job_wall_clock_per_account_seconds promqlquery
+sum by(user) (
+  max_over_time(job_metadata_running_seconds{account="${account}"}[$period])
+    * on(wlm, job_id) group_right()
+  max_over_time(job_metadata_num_cpus{account="${account}"}[$period])
+)
+
+   Some further adjustments are:
+
+[basecm11->monitoring->query]% use users_job_wall_clock_per_account_seconds
+[basecm11->monitoring->query[use users_job_wall_clock_per_account_seconds]% set class account/level/1
+[basecm11->..._seconds*]% set description "Wall clock time used by users per account for the last period"
+[basecm11->monitoring->query*[use users_job_wall_clock_per_account_seconds*]% commit
+
+   The new query can then be run by the administrator on demand.
+   The original query sums over all accounts:
+[basecm11->monitoring->labeledentity]% instantquery -q users_job_wall_clock_seconds
+user      Timestamp                 Value
+--------- ------------------------- -------------------
+alice     Mon Jun 24 10:25:20 2019 28.787
+bob       Mon Jun 24 10:25:20 2019 26.787
+charline Mon Jun 24 10:25:20 2019 102.83
+eve       Mon Jun 24 10:25:20 2019 58.574
+frank     Mon Jun 24 10:25:20 2019 85.362
+
+   The parameterized query lets the administrator run the same query for specific accounts.
+   If Slurm accounts for physics phys and mathematics math have been created with
+
+[root@basecm11 ~]# sacctmgr add account phys,math
+
+    then account=phys and account=math, are the <key>="<value>" format options. The query can then
+be run with the -p|--parameter option as follows:
+
+[basecm11->monitoring->labeledentity]% instantquery -q users_job_wall_clock_per_account_second\
+s -p account=phys -p period=1w
+user      Timestamp                 Value
+--------- ------------------------- --------
+alice     Mon Jun 24 10:25:22 2019 28.787
+charline Mon Jun 24 10:25:22 2019 29.787
+frank     Mon Jun 24 10:25:22 2019 30.788
+[basecm11->monitoring->labeledentity]% instantquery -q users_job_wall_clock_per_account_second\
+s -p account=math -p period=1w
+user      Timestamp                 Value
+--------- ------------------------- --------
+bob       Mon Jun 24 10:25:37 2019 26.787
+charline Mon Jun 24 10:25:37 2019 73.049
+eve       Mon Jun 24 10:25:37 2019 30.787
+682                                                                        Monitoring: Job Accounting
+
+12.4.1 Two Job GPU Metrics Used In PromQL Queries
+There are two important job GPU metrics (section G.1.8) that are used in several PromQL queries. These
+two are:
+
+  1. The job_gpu_utilization GPU metric:
+      This is based on the gpu_utilization metric collected on GPU nodes via the DCGM library. The
+      values it takes are in the interval [0, 1]. In DCGM the name of the metric is DCGM_FI_DEV_GPU_UTIL,
+      and it represents the total GPU utilization.
+      The gpu_utilization metric values collected on the GPU are mapped to the job that uses the GPU
+      at the time of the collection.
+      job_gpu_utilization is a labeled entity, tagged with a label representing a job. This allows the
+      person carrying out PromQL queries to use such parameters as job id, job user, and so on. It
+      is assumed that one GPU is used only by processes of a single job, but there can be several GPUs,
+      each used by different jobs simultaneously. Each of the GPUs on the node has independent values
+      of job_gpu_utilization.
+      One example of a PromQL query that uses the job_gpu_utilization GPU metric is
+      job_names_usage_gpu, which has the query expansion:
+
+      sum by(job_name) (
+        sum_over_time(job_gpu_utilization[${period}])
+      )
+
+  2. The job_gpu_wasted GPU metric:
+      The job_gpu_wasted metric is a labeled entity (tagged metric) and is based on the
+      job_gpu_utilization metric. The job_gpu_wasted metric shows what fraction, out of 1, of the GPUs
+      on the node were unused by a job despite being allocated by the workload manager for that job. It
+      can take values in the interval [0, 1].
+      It is calculated as follows:
+             _gpus_utilization
+      1 − allrequested_gpus
+      where
+
+        • all_gpus_utilization is the average utilization for all gpu_utilization metric values collected
+          in the interval [-1; +1] from the time of the metric calculation for all GPUs requested by the
+          job on the node
+        • requested_gpus is the number of GPUs allocated for the job in the workload manager
+
+      For example:
+      If a job requests two GPUs on a node, and the job does not use any of those GPUs at all, then
+      job_gpu_wasted takes the value 1.
+      If the same job uses half of the first GPU and does not use the second one, then the metric value is
+      calculated as:
+           (0.5+0)
+      1−       2   = 0.75
+      One example of a PromQL query that uses job_gpu_wasted is jobs_wasted_allocated_gpus, which
+      has the query expansion:
+
+      avg by(job_id) (
+        round(100 * avg_over_time(job_gpu_wasted[${period}]))
+      )
+12.5 Job Accounting In Base View                                                                      683
+
+12.5    Job Accounting In Base View
+Job accounting in Base View is designed to present accounts of jobs without having to construct com-
+mand lines with syntaxes that can be tricky to deal with. One useful output format is as basic Excel-
+format spreadsheets.
+    Job accounting can be viewed within Base View’s accounting mode at the top right hand corner of
+the Base View standard display (figure 10.5).
+    By default, job accounting opens up with a dashboard report called K8S Container Metrics, which
+provides some Kubernetes container metrics panels (figure 12.1).
+    If Kubernetes containers have been running jobs that have been sampled, then pre-selected container-
+related queries can be run from these panels, and the data samples can be displayed as tables or plots. If
+Kubernetes containers have not been running jobs, then the pre-selected container-related queries have
+no data samples to display (figure 12.1):
+
+
+
+                          Add a new dashboard
+
+
+
+
+                       Figure 12.1: Job accounting: K8S container metrics panels
+
+   If the ⊕ icon next to the K8S Container Metrics tab is clicked, then a new dashboard report can be
+created. With the default options it displays a dashboard report with n accounting panel that has some
+pre-selected queries related to user jobs over the last period (figure 12.2):
+684                                                                        Monitoring: Job Accounting
+
+
+
+
+                                                                              Add a new panel
+                                                                                              @
+                                                                                              R
+                                                                                              @
+
+                                                                                                      6
+
+
+
+
+      6     6    6      6    6      6    6     6
+
+
+
+
+ Show/hide Show/hide Toggle         Download
+ query list   chart       price     results
+          Toggle    Show/hide Drilldown Run                                                  Gear icon to change
+          advanced  table       query list  query                                            panel layout
+
+                                  Figure 12.2: Job Accounting: Panel
+
+12.5.1 Management And Use Of The Accounting Panel
+The following description is illustrated by figure 12.2:
+   A Base View job accounting dashboard is made up of collections of Base View job accounting panels.
+
+   • To add a new dashboard, the + button can be clicked in the dashboard menu bar. An existing
+     dashboard can be removed by clicking on the trash icon in the menu bar associated with that
+     existing dashboard.
+
+   • To add a new panel, the + button can be clicked in the panel menu bar. An existing panel can be
+     removed by clicking on the trash icon in the menu bar associated with that existing panel.
+
+    Job accounting is intended to present accounts of jobs. So, when a new dashboard is created, a dialog
+asks for inputs such as the time period over which the report is to be carried out, and the report name.
+    When the new dashboard is created, several predefined PromQL queries are selected by default.
+These can be modified using selection checkboxes within the query list. The query list can be shown or
+hidden by clicking on the Show/hide query list icon ( ).
+    By default, when the new dashboard is saved, the selected queries are run and a table can be seen of
+the results.
+    How to run and view PromQL queries in the Base View accounting panel is described in this section
+(12.5). The PromQL query specification itself in Base View is described in more detail in section 12.6.
+
+PromQL Queries Input In The Accounting Panel
+The PromQL queries (page 671) that are to be used can be managed in the query list associated with the
+Show/hide query list icon ( ).
+    Checkboxes can be ticked to select multiple queries, as long as the query classes allow it. The class
+restrictions are dynamically enforced by Base View by graying out the queries that cannot be checkboxed
+as query checkboxes are ticked.
+    To tick a new class of query in the same panel, all the queries that do not match the new class must
+first be unticked.
+12.5 Job Accounting In Base View                                                                         685
+
+    PromQL queries can by run in two modes: basic or advanced, by toggling the advanced icon ( ) of
+figure 12.2. In basic mode, several instant queries can be run. In advanced mode, only one instant query
+or a single range query can be run per panel.
+
+Display Of The Results Of PromQL Query Runs In The Accounting Panel: Rows, Pie Charts, And Plots
+The display of a run result can be managed by clicking on the Show/Hide table icon ( ), or clicking on
+the Show/Hide chart icon. ( ).
+
+   • The table option toggles the display of the result as rows of data per classifier (user) (figure 12.3):
+
+
+
+
+                Figure 12.3: Job accounting: PromQL query instant mode table display
+
+     The classifier can be a user, a cluster, an account, or any other key in the labeled entity.
+
+   • The chart option toggle toggles the display of the result as a chart.
+
+        – For a PromQL instant mode query, the chart can be a pie or doughnut chart (figure 12.4), or
+          an x-y plot if the x-axis values are time.
+
+
+
+
+              Figure 12.4: Job accounting: PromQL query instant mode pie chart display
+
+          The pie chart shows how much of the resource is used at that instant per user, per cluster, per
+          account, or per other classifier.
+          How much of the resource is used can be displayed upon the pie chart in figures, either as
+          the amount itself, or as a percentage of the total classifier amount.
+          The pie chart can display classifiers using a maximum of 10 slices, by default. If needed, the
+          right amount of the smallest extra slices are grouped together as one slice, others, so that the
+          maximum number is not exceeded
+686                                                                      Monitoring: Job Accounting
+
+        – For a PromQL range mode query, the chart is an x-y plot, with the x-axis being time (fig-
+          ure 12.5):
+
+
+
+
+              Figure 12.5: Job accounting: PromQL query instant mode x-y plot display
+
+          To have it display, the plot requires that
+            * the advanced mode ( ) be active
+            * the chart mode ( ) be active
+            * the range query mode ( ) be active
+            * the query state be saved (    ), and then run ( )
+          The plot shows resource use versus time. The plot can be per user, cluster, account, or other
+          classifier.
+          A particular user or other classifier can be highlighted on the plot by placing the mouse
+          pointer over the appropriate legend color icon.
+
+   How Base View is used to take PromQL query run inputs, and present PromQL query run results,
+has been covered in this section without going into much detail on PromQL specification itself for the
+run. PromQL specification is covered in more detail in the next section.
+
+
+12.6    PromQL Query Modes And Specification In Base View
+The advanced mode of Base View’s PromQL query mode specification is essentially a superset of the
+basic mode specification. The options that are described next for advanced mode therefore essentially
+include descriptions for the options for basic mode.
+    Advanced mode has the following options:
+
+   • the PromQL Query: Advanced mode allows the PromQL query itself to be edited in an editing box.
+
+   • the Query Mode: This can be either Instant query mode ( ), which deals with instant query
+     types, or it can be Range query mode ( ), which deals with range query types. Only advanced
+     mode handles both query modes—basic mode only deals with instant query mode.
+12.6 PromQL Query Modes And Specification In Base View                                                  687
+
+       – An Instant Query Type is executed at a particular instant. The instant at which it is executed
+         is now by default, but it can be set to a time earlier on. It outputs a single number for each
+         entity (for example, a user). The number for the entity is the interpolated data value for the
+         PromQL query at that time. The data values obtained by the PromQL query are typically a
+         list of the data values for each entity (for example, a list of memory consumed for each user)
+         over a preceding time period, where the preceding time period is defined in the PromQL
+         query.
+         The single number obtained by the query for each entity is typically used to summarize a
+         value at that instant for that entity.
+         An example of the Instant query type is users_job_waiting_seconds. This provides the
+         total waiting time, in seconds, for each user, for the jobs the users ran during the past period.
+         The past period is a time period, such as a week, defined for the query. Thus, the waiting
+         time is caculated at the instant of time (Time) specified for the query, over the past period.
+         If the Time parameter for the query is kept as the default value of now, then the query provides
+         the latest value for each user.
+         If the Time parameter is set to a time earlier on, then the query picks up the value at that
+         earlier time in the past, or provides an interpolated value at that earlier time, for each user,
+         and bases the calculation on a past period going further back from that earlier time.
+         The display can be presented in rows of {user, value} pairs using the Show/Hide table icon
+         ( ). The display can also be presented as a pie chart using the Show/Hide chart option ( ).
+         In the chart each slice is proportional to the value for the particular user, compared with the
+         total value for all the users. Instead of a pie chart, the visualization can instead be a ring (or
+         doughnut) chart, which is really just a pie chart with a hole in the centre.
+         Basic mode does have an advantage over advanced mode in that it allows multiple instant
+         queries to be run in an account pannel. Correspondingly, multiple results are displayed in
+         the form of multiple sets of table entries and multiple pie charts. An advanced mode instant
+         query run, in contrast, only allows one instant query to be run, with a corresponding result
+         of one set of table entries, and one pie chart.
+         PromQL allows a variety of time specifications. The interface validates whatever the interface
+         user types in, and there is a calendar widget that allows an absolute time to be specified. Some
+         useful time specifications are:
+         Example
+
+          Time specification                      What time is meant
+          now                                     at the time it is run
+          now-30m                                 30 minutes ago
+          now-1h                                  one hour ago
+          now-1h/h                                an hour ago, starting at the start of that hour
+          now-2d                                  48 hours ago
+          now-0d/d                                today’s midnight (the most recently-passed midnight)∗
+          now-1d/d                                yesterday’s midnight∗∗
+          now-2d/d                                day before yesterday’s midnight
+          Thursday, July 11, 2019 17:00:00        an absolute time (as set by the calendar widget)
+         ∗ The meaning can be understood by looking at how /d operates. It rounds off the day by truncation,
+
+         which in the case of now-0d/d means the midnight prior to now.
+         ∗∗ Similarly, yesterday’s midnight is the midnight immediately prior to 24 hours ago.
+
+
+         The time units for PromQL are (https://prometheus.io/docs/prometheus/latest/querying/
+         basics/#range-vector-selectors):
+688                                                                    Monitoring: Job Accounting
+
+
+         * s - seconds
+         * m - minutes
+         * h - hour
+         * d - day
+         * w - week
+         * M - month (31 days). M is not a PromQL unit, so it cannot be used inside a query. But it is
+           a handy alias in BCM for an invariant time of 31 days.
+          * y - year
+       The - operator in Prometheus is an offset operator, used only after now in the time specifica-
+       tion field. The /<time unit> syntax implies a start at that unit of time.
+       Thus if, for example, now-1d/d is set as the end time, then when the query runs, it picks up
+       the values at “yesterday’s midnight.” For each user, the value is the number of seconds the
+       job of the user was in a wait state for the week prior to yesterday’s midnight. It rounds off
+       the day by truncation, which in the case of now-1d/d means the midnight prior to 24 hours
+       ago. Varying the user means that the number of seconds varies accordingly.
+       The results of a run can be
+         * displayed in rows as values in Base View itself (figure 12.3)
+         * downloaded as a CSV file
+         * downloaded as an Excel spreadsheet.
+       The last two options are convenient for plotting graphs that are more sophisticated than what
+       Base View offers.
+      – A Range Query Type
+       The Range query mode can only be accessed from advanced mode, and allows the range
+       query type to be executed.
+       This range query type is executed over a time period. It fetches a value for each interval
+       within that time range, and then plots these values.
+       An example of the Range query type is users_job_memory_usage_bytes. This fetches the to-
+       tal memory usage for jobs over intervals, grouped per user during that interval (figure 12.6).
+       The query submitter can set Start time and End time parameters. However, very long
+       ranges can be computationally expensive.
+12.7 Access Control For Workload Accounting And Reporting                                          689
+
+
+
+
+                        Figure 12.6: Job Accounting: User Values Over A Range
+
+   • the Interval: The interval is the plot interval along the time axis. When editing a range query
+     type, the interval for a range query run is set when the Save button is clicked. Lower numbers
+     lead to smaller intervals, hence higher resolution and higher query execution times. A value of
+     0 means that a reasonable default interval is attempted. Choosing an interval that is less than
+     the sampling time of the metric is a bit pointless, and tends to lead to data values that display
+     non-smooth behaviour.
+
+
+12.7    Access Control For Workload Accounting And Reporting
+The ability to view jobs is controlled by four tokens defined in a user’s profile:
+
+  1. GET_JOB_TOKEN: Allows all running jobs to be seen.
+
+  2. GET_OWN_JOB_TOKEN: Allows owned running jobs to be seen.
+
+  3. GET_JOBINFO_TOKEN: Allows all cached historic and running jobs to be seen.
+
+  4. GET_OWN_JOBINFO_TOKEN: Allows owned cached historic and running jobs to be seen.
+
+    To retrieve monitoring data for the job, the token PLOT_TOKEN must also be defined for the profile.
+    A job is always owned by the user that runs it. Ownership of a job can also be shared with other
+users by defining project managers. This establishes a 2-level hierarchy, with project managers above
+the subordinates, who are users that are assigned to the project manager. One or more accounts, can be
+assigned to project managers.
+
+12.7.1 Defining Project Managers Using Internal User Management
+Any user can be turned into a project manager. If the BCM LDAP server is being used, then the project
+manager can be configured via cmsh.
+
+Example
+690                                                                         Monitoring: Job Accounting
+
+alice can be made the project manager of bob and charlie. This allows her access to the job data of her
+subordinates:
+[basecm11->user]% projectmanager alice
+[basecm11->user*[alice*]->projectmanager*]% set users bob charlie
+[basecm11->user*[alice*]->projectmanager*]% commit
+
+Example
+
+albert can be made the manager of the physics account. This gives him access to all jobs running under
+that account:
+[basecm11->user]% projectmanager albert
+[basecm11->user[albert*]->projectmanager*]% set accounts physics
+[basecm11->user[albert*]->projectmanager*]% commit
+
+      Both mechanisms, users and accounts, can be combined to provide access control.
+
+Example
+
+To limit access to jobs that are running under the physics account to a specific set of users:
+[basecm11->user]% projectmanager albert
+[basecm11->user*[albert*]->projectmanager*]% set accounts physics
+[basecm11->user*[albert*]->projectmanager*]% set users niels richard
+[basecm11->user*[albert*]->projectmanager*]% set operator and
+[basecm11->user*[albert*]->projectmanager*]% commit
+
+12.7.2 Defining Project Managers Using External User Management
+If an external user management server is used instead of the BCM LDAP server, then project managers
+cannot be defined in cmsh. Instead, a script has to be written that provides the definitions for project
+managers in the form of a JSON object.
+    The full path of the script, for example /path/to/the/script, has to be set as a value to the
+ProjectManagerScript parameter in cmd.conf. This is done by adding it to the AdvancedConfig di-
+rective (page 888):
+
+Example
+
+AdvancedConfig = { "ProjectManagerScript=/path/to/the/script" }
+
+   The directive becomes active after restarting CMDaemon.
+   An example of a project manager script can be found at /cm/local/apps/cmd/scripts/
+cm-project-managers.py. It gives users access to each other’s jobs if they share at least one group.
+   The easiest way to use the script is use a mapping to inform CMDaemon which of the other user’s
+jobs each user has access to.
+
+Example
+
+So if frank can access data belonging to bob and dennis, while bob can access data belonging to dennis,
+while dennis can only access his own data, then the project manager configurations can be set up as:
+{
+    "frank": ["bob", "dennis"],
+    "bob": ["dennis"],
+    "dennis": []
+}
+12.8 Drilldown Queries For Workload Accounting And Reporting                                           691
+
+   Account access control can also be included in the output of the script, by setting values for the
+users, accounts, and the boolean operator (and, or) options:
+Example
+
+{
+    "alice": {
+      "users": ["charline", "eve"],
+      "accounts": ["math, "chem"],
+      "and": True
+    },
+    "eve": {
+      "accounts": ["chem"]
+    }
+}
+
+   After restarting CMDaemon, it automatically runs this script when committing a change for a device
+or data producer. It is also possible to manually trigger the script to be run on the active head, by
+executing:
+[root@basecm11 ~]# echo "PROJECT.MANAGERS.UPDATE" > /var/spool/cmd/eventbucket
+
+     The script must not take more than a few seconds to process.
+
+Workaround For Project Manager Script That Takes Too Long
+If the script takes longer to run, then it must be run outside of CMDaemon, and its output should be
+saved as a file. If the output file is located at /path/to/the/file, then its path can be set as an input
+to the ProjectManagerFile parameter in cmd.conf. This is done by adding it to the AdvancedConfig
+directive (page 888):
+
+Example
+
+AdvancedConfig = { "ProjectManagerFile=/path/to/the/file" }
+
+     The project manager definitions become active after CMDaemon is restarted.
+
+
+12.8     Drilldown Queries For Workload Accounting And Reporting
+Metrics can be classified in various ways. Common ways are by:
+
+    • device: A typical hardware device is a node. Each node can then have its metrics, which are CPU
+      usage, memory, storage, and other resource use, displayed over time. Device metrics are largely
+      covered in this chapter in the sections up to and including section 10.8.
+
+    • job: With this classifier, each job that is run by a workload manager can have its metrics, which are
+      CPU usage, memory, storage and other resource use, displayed over time. Job metrics are covered
+      in Chapter 11.
+
+  Other ways of classifying metrics are part of workload accounting. With workload accounting, a
+workload manager runs jobs, and a job metric can be classified by:
+
+    • user
+
+    • job (job ID)
+
+    • account
+
+    • job name
+692                                                                           Monitoring: Job Accounting
+
+     The classification can be carried out singly. However, it can also be carried out at the same time, like
+filters. For example:
+
+   • each user could be classified for a particular job metric
+     or
+
+   • a particular user could be classified for a particular job metric
+     or
+
+   • a particular user could be classifed for a particular job metric for a particular job ID only
+     or
+
+   • a particular user could be classified for a particular job metric for that particular job ID only for a
+     particular account only
+
+    A cluster administrator that uses several filters to get to the “bottom” of how resources are being
+used, functions in a manner reminiscent of someone drilling to the bottom to find something. This type
+of filtering is therefore called drilldown. Each filter corresponds to a level of drilldown.
+    Drilldown is a bit like how in cmsh the use of the filter command within jobs mode can narrow
+down what is displayed:
+
+Example
+
+[basecm11->wlm[slurm]->jobs]% filter -n iozone -u edgar -a projecty
+Job ID Job name User Queue Submit time         Start time End time             Nodes Exit code
+------ -------- ------ ----- -----------       ---------- --------             -----   ---------
+15      iozone    edgar defq    14:22:05       14:50:22    15:00:24            node001 0
+19      iozone    edgar defq    14:26:07       15:10:25    15:20:19            node001 0
+25      iozone    edgar defq    14:34:57       15:30:20    15:40:39            node001 0
+36      iozone    edgar defq    14:43:54       16:10:15    16:19:57            node001 0
+41      iozone    edgar defq    14:47:24       16:19:57    16:29:42            node001 0
+
+    except that in cmsh the value of the job metric is not specified or shown by the filter command.
+    Drilldown is also rather similar in concept to how pivot tables are used in Excel spreadsheets. Pivot
+tables are particular selections (like the filtered choices in drilldown). The selections are applied to a
+great deal of raw data. A function (like the metric in drilldown) is applied to the selection, to present
+the information more clearly to the end viewer.
+    In contrast with the filter output of cmsh, in Base View the job metric value is made visible in a table
+or in graphs over the period.
+
+12.8.1 The drilldownoverview Command
+The list of predefined drilldown queries of section 12.3.1 can be listed with the drilldownoverview
+command. This can be run from the query submode of the monitoring mode. The output, with some
+columns cut out for convenience, looks like:
+
+Example
+
+[basecm11->monitoring->query]% drilldownoverview |cut -b1-54,80-143
+
+Query                                                         Drill down query
+-----------------------------------------------------         -------------------------------------------------------
+accounts_wasted_memory                                        wasted_memory_job_name_for_account (1)
+job_information_by_account (0)                                job_information_by_job_name_for_account (1)
+job_information_by_account (0)                                job_information_by_user_for_account (1)
+job_information_by_job_name_for_account (1)                   job_information_by_user_for_account_and_job_name (2)
+job_information_by_job_name_for_account_and_user (2)          job_information_by_job_id_for_account_and_user_and_job\
+12.8 Drilldown Queries For Workload Accounting And Reporting                                    693
+
+                                                                                                _name (3)
+job_information_by_job_name_for_user (1)                job_information_by_job_id_for_user_and_job_name (2)
+job_information_by_user (0)                             job_information_by_job_id_for_user (1)
+job_information_by_user (0)                             job_information_by_job_name_for_user (1)
+job_information_by_user_for_account (1)                 job_information_by_job_name_for_account_and_user (2)
+job_information_by_user_for_account_and_job_name (2)    job_information_by_job_id_for_account_and_user_and_job\
+                                                                                                _name (3)
+users_job_effective_cpu_seconds                         job_effective_cpu_seconds_job_name_for_user (1)
+users_job_io_bytes                                      job_io_bytes_per_job_name_for_user (1)
+users_job_memory_usage_bytes                            job_memory_usage_bytes_per_job_name_for_user (1)
+users_job_running_count                                 job_running_count_job_name_for_user (1)
+users_job_waiting_seconds                               job_waiting_seconds_job_name_for_user (1)
+users_job_wall_clock_seconds                            job_wall_clock_seconds_job_name_for_user (1)
+users_unused_gpu                                        unused_gpu_job_name_for_user (1)
+users_used_gpu                                          used_gpu_job_name_for_user (1)
+users_wasted_allocated_gpus                             wasted_allocated_gpus_for_user (1)
+users_wasted_memory                                     wasted_memory_job_name_for_user (1)
+
+[basecm11->monitoring->query]%
+
+   The queries have drilldown options. For example, the job_information_by_account:
+[basecm11->monitoring->query]% use job_information_by_account
+[basecm11->monitoring->query[job_information_by_account]]% show
+Parameter                        Value
+-------------------------------- ------------------------------------------------------------
+Name                             job_information_by_account
+Revision
+Class                            drilldown/level/0
+Alias
+Start time                       now
+End time
+Interval                         0s
+Description                      Generic job information drill down query grouped by account
+PromQL Query                     <61B>
+Access                           Public
+Unit
+Price                            0.000000
+Currency                         $
+Preference                       0
+Drill down                       <2 in submode>
+Notes                            <0B>
+[basecm11->monitoring->query[job_information_by_account]]%
+[basecm11->monitoring->query[job_information_by_account]]% drilldown
+[basecm11->monitoring->query[job_information_by_account]->drilldown]% list
+Name (key) Parameters     Query
+------------ ------------ ----------------------------------------
+job_name     account      job_information_by_job_name_for_account
+user         account      job_information_by_user_for_account
+[basecm11->monitoring->query[job_information_by_account]->drilldown]% use job_name
+[basecm11->monitoring->query[job_information_by_account]->drilldown[job_name]]% show
+Parameter                        Value
+-------------------------------- ------------------------------------------------
+Name                             job_name
+Revision
+Parameters                       account
+Query                            job_information_by_job_name_for_account
+694                                                                        Monitoring: Job Accounting
+
+12.9     The grid Command For Job Accounting
+A way to carry out job accounting without relying on PromQL queries is the grid command of cmsh.
+The grid command can be accessed from within wlm mode for a workload manager. The command
+displays the nodes in a grid.
+   An example of grid output can be seen in the session of page 695.
+   As seen in that output, the nodes are displayed in a sequence of rows. For each row, the following
+row of nodes has the same sequence of nodes, but after an interval of time. Each node in the grid is
+displayed as a colored block called a timeblock. The timeblock displays a value for the classifier entity
+that the grid command associates with that node. The value for the timeblock is indicated by either its
+color, or by text superimposed on that timeblock, or both.
+
+12.9.1 The grid Command Help Text
+The command options to grid can be looked up in the help text:
+Example
+[basecm11->wlm[slurm]]% help grid
+Name:
+          grid - Show a grid of historic job information
+
+Usage:
+           grid [options]
+
+Options:
+           -n, --nodes node(list)
+                List of nodes, e.g. node001..node015,node020..node028,node030 or ^/some/file/containing/hostnames
+
+...
+
+    The classifier entity shown by grid can be called its mode, and it can be set with the --mode option.
+By default the mode is set to used, which means the classifier entity value displayed for the node is
+either that it is being used to run a job, or not being used to run a job.
+    A help text to describe modes available for a timeblock can be seen with:
+Example
+[basecm11->wlm[slurm]]% grid --mode x
+Mode x is not implemented
+Valid modes:
+
+used:        the node was used in this timeblock
+count:       the number of jobs using the node in this timeblock
+average:     the averaged time jobs used the node in this timeblock
+user:        the user that used the node the most in this timeblock
+group:       the group that used the node the most in this timeblock
+account:     the account that used the node the most in this timeblock
+job-name:    the job-name that used the node the most in this timeblock
+job-id:      the job-name that used the node the most in this timeblock
+count-cpu: the number of requested CPUs on the node in this timeblock
+average-cpu: the time averaged of requested CPUs on the node in this timeblock
+count-gpu: the number of requested GPUs on the node in this timeblock
+average-gpu: the time averaged of requested GPUs on the node in this timeblock
+
+12.9.2 Some grid Command Examples
+With the grid command, the timeblock value is given a color, and can also be indicated by an associated
+text value.
+12.9 The grid Command For Job Accounting                                                          695
+
+Displaying Nodes Used
+For example: over intervals of 10 minutes (600 seconds), from 28 hours ago to 27 hours ago, for nodes
+node001, node002, node003, the used mode for nodes can be displayed with the command:
+
+Example
+
+[basecm11->wlm[slurm]]% grid --after -28h --before -27h --interval 600 -n node001..node003 --text --legend
+node001                          node002                       node003
+
+                                      Thu Nov 23 16:04:05 2023
+1.000000                          0.000000                           0.000000
+0.000000                          0.000000                           1.000000
+1.000000                          1.000000                           1.000000
+1.000000                          1.000000                           1.000000
+1.000000                          1.000000                           1.000000
+1.000000                          1.000000                           1.000000
+0.000000                          0.000000                           0.000000
+                                      Thu Nov 23 17:04:05 2023
+
+
+Not running a job         Running a job
+
+
+   The --legend option provides a color legend after the display, and the --text option for this mode
+overwrites the timeblock with an associated value of 1.00000 or 0.000000.
+   The time specification is explained in detail in section 12.9.3.
+
+Displaying Users Usage Of Nodes
+Another example, which displays users that used the node the most, and their usage as a percentage,
+per timeblock of 600s, over a time from 5370 minutes in the past to 5350 minutes in the past:
+
+[basecm11->wlm[slurm]]% grid --mode user --after -5370m --before -5350m -n node001..node003 --interval 600 \
+                   --text --legend
+ node001                         node002                         node003
+
+                                      Thu Nov 23 16:23:59 2023
+ bob (10%)                          joe (9%)                             carol (9%)
+ bob (7%)                           joe (9%)                             eve (20%)
+ dennis (11%)                       dennis (5%)                          hugh (9%)
+                                       Thu Nov 23 16:43:59 2023
+
+
+   joe       eve        bob        carol        hugh        dennis
+[basecm11->wlm[slurm]]%
+
+
+   The display percentage can be disabled with the -no-percent option.
+
+Displaying Larger Numbers Of Nodes
+For larger clusters, the administrator can view the grid output over a larger monitor, or over several
+monitors, and perhaps using higher resolutions to get a colour map. Figure 12.7 shows an output for
+128 nodes:
+696                                                                         Monitoring: Job Accounting
+
+
+
+
+                    Figure 12.7: Job Accounting: Grid account output for 128 nodes
+
+   The watch command of cmsh can be used to display updates as the cluster is used during the day,
+without requiring input from the cluster administrator. Patterns of use may be viewed in this manner.
+   For example, the black parts of node rows in figure 12.7 are a visual indication of times when those
+nodes were not used.
+
+12.9.3 The grid Command Time Specification
+The grid command time specification is identical to that of the dumpmonitoringdata command (sec-
+tion 10.6.4), except that dumpmonitoringdata has implicit mandatory arguments. The time specifications
+for grid are, on the other hand, done explicitly, and use the time options and arguments:
+
+   • --before <end-time>
+      and
+
+   • --after <start-time>
+
+   The syntax for the time specifications of grid is also used by the statistics and filter commands.
+   The time options --after (mnemonic: aFTter=From Time) and --before (mnemonic: befOre=tO)
+can have their arguments specified as follows:
+
+   • Fixed time format: The format for the times that make up the time pair can be:
+
+        – [YY/MM/DD] HH:MM[:SS]
+          (If YY/MM/DD is used, then each time must be enclosed in double quotes)
+        – The unix epoch time (seconds since 00:00:00 1 January 1970)
+
+   • now: For the --before option, a value of now can be set. The time at which the grid command is
+     run is then used.
+
+   • Relative time format: One item in the time pair can be set to a fixed time format. The other item in
+     the time pair can then have its time set relative to the fixed time item. The format for the non-fixed
+     time item (the relative time item) can then be specified as follows:
+
+        – For the <start-time>, a number prefixed with “-” is used. It indicates a time that much earlier
+          than the fixed end time.
+        – For the <end-time>, a number prefixed with “+” is used. It indicates a time that much later
+          than the fixed start time.
+        – The number values also have suffix values indicating the units of time, as seconds (s), minutes
+          (m), hours (h), or days (d).
+12.9 The grid Command For Job Accounting                                                               697
+
+    The relative time format is summarized in the following table:
+      Unit        <start-time>   <end-time>
+      seconds:    -<number>s     +<number>s
+      minutes:    -<number>m     +<number>m
+      hours:      -<number>h     +<number>h
+      days:       -<number>d     +<number>d
+
+
+  • Both <start-time> and <end-time> can have their values prefixed with a “-”. In this case, the range
+    over which the monitored values are seen is in the past, relative to the current time. If the end
+    time for the range is specified as further in the past than the starting time, then the time values are
+    swapped over so that the end time becomes more recent than the starting time.

@@ -1,0 +1,49 @@
+
+                                                                                  H
+                  Workload Manager
+      Configuration Files Updated By
+                         CMDaemon
+This appendix lists workload manager configuration files changed by CMDaemon, events causing such
+change, and the file or property changed.
+
+
+H.1   Slurm
+ File/Property                             Updates What?   Updated During
+ /cm/shared/apps/slurm/var/etc/            head node       Add/Remove/Update nodes, hostname
+ <Slurm instance name>/slurm.conf                          change
+
+ /cm/shared/apps/slurm/var/etc/            head node       Add/Remove/Update nodes, hostname
+ <Slurm instance name>/slurmdbd.conf                       change
+
+ /cm/shared/apps/slurm/var/etc/            all nodes       Add/Remove/Update nodes
+ <Slurm instance name>/gres.conf
+
+ /cm/shared/apps/slurm/var/etc/            head node       Add/Remove/Update nodes
+ <Slurm instance name>/topology.conf
+
+
+H.2   PBS Professional/OpenPBS
+ File/Property                            Updates What?               Updated During
+ $PBS_CONF_FILE                           head node, software image   hostname/domain change, failover
+ /cm/local/apps/<openpbs or pbspro>/      head node                   hostname change, failover
+ var/spool/mom_priv/config
+ The default value of $PBS_CONF_FILE in BCM
+ is /cm/local/apps/<openpbs or pbspro>/var/etc/pbs.conf
+
+
+H.3   LSF
+1014                              Workload Manager Configuration Files Updated By CMDaemon
+
+ File/Property                                   Updates What?    Updated During
+ $LSF_ENVDIR/lsf.conf                            head node        hostname/domain change, failover
+ $LSF_ENVDIR/lsf.cluster.<clustername>           head node        add/remove/update nodes
+ $LSF_ENVDIR/lsf.sudoers                         head node        hostname/domain change, failover
+ $LSF_ENVDIR/hosts                               cloud-director   add/remove/update cloud nodes
+ $LSF_ENVDIR/lsbatch/<clustername>/              head node        add/remove/update queues
+ configdir/lsb.queues
+ $LSF_ENVDIR/lsbatch/<clustername>/              head node        add/remove/update nodes
+ configdir/lsb.hosts
+ The default value of $LSF_ENVDIR in BCM
+ is /cm/shared/apps/lsf/var/conf/<clustername>
+    On each node where the lsfd service runs, CMDaemon creates a symlink /etc/lsf.conf that points
+to $LSF_ENVDIR/lsf.conf. This is required by LSF daemons.

@@ -1,0 +1,438 @@
+                                                                                  13
+              Monitoring: Job Chargeback
+13.1     Introduction
+13.1.1 The Word “Chargeback”
+In a non-IT context, the term chargeback is commonly used with credit cards, in a situation where a
+cardholder disputes a payment that was made to a merchant. When the credit card company pays back
+the disputed payment to the card holder, that is called a chargeback.
+    In an IT context, the term chargeback still has to do with money, and the idea of getting money back.
+However, in practice the intention ideally is not about disputing costs, but rather about measuring what
+the costs are of the IT resources that have been requested. Measurement of requested resources means
+that there is a potential to charge back the users or groups of users who requested these resources.
+    So, for example, an IT department for an organization may be allocated a budget to run a cluster,
+meant for the benefit of the organization. The IT department may make the cluster available to many
+other departments. These other departments request cluster resources. The IT department measures the
+requested resources and charges back the associated costs.
+    If a cluster is used by several different departments in the organization, then a simple way to pay
+for resource requests is to spread the entire cost as a general overhead expense over all departments
+equally. That may make matters easy for the cluster administrator, but can be harmful to the organi-
+zation, because without a fair resource request management, there is a tendency for resource request
+abuse.
+    If however the resource requests per department are measured, it means that department managers
+can be kept aware of how resource requests are being divided up. Being able to measure requested re-
+sources per department, and thus being able to charge back the department for the requested resources,
+means that the organization using the cluster can plan and manage resource request budgets efficiently
+and fairly.
+
+13.1.2  Comparison Of Job Chargeback Monitoring Measurement With Other Monitoring
+        Measurements
+Monitoring measurements in BCM in general can be considered to be:
+
+   • Monitoring of devices (Chapter 10), which is about monitoring devices in a cluster.
+
+   • Job monitoring (Chapter 11), which is about using monitoring to measure the resources used by
+     jobs that actually run.
+
+   • Job accounting (Chapter 12), which is about using monitoring to measure the resources used by a
+     user, a group, or other classifier entity.
+
+   • Job chargeback (this chapter), which is about using monitoring to measure the resources requested
+     for a job, whether the resources are used or not. This allows the requester to be charged the costs
+     of requesting those resources.
+700                                                                         Monitoring: Job Chargeback
+
+    The difference between actual resource use and requested resource use can be illustrated by a thought
+experiment:
+    First, a job is run that runs the CPU at 100% for 10 minutes. After that job is completed, a second job
+is run that runs a sleep command that lasts 10 minutes.
+    If these two jobs are considered from the point of view of CPU resource usage, then according to the
+workload manager:
+    The first job actually uses the CPU for 10 minutes, and the administrator can work out from the job
+monitoring system what user that ran that job, and charge the user for CPU usage.
+    For the second job, the administrator cannot use the job monitoring system to charge the user for the
+CPU usage because there was no significant usage measured. However, resources were used up during
+this time, because the request for the job blocked the availability of that CPU during this period for
+other users. The administrator would like to charge the user for preventing others from accessing the
+resources during that period. To do that requires measuring the resources requested during that period,
+rather than resources that were really used.
+    Thus, the aim of job chargeback monitoring is to provide a way to track resource requests, which
+typically differs a little from resource usage.
+
+
+13.2     Job Chargeback Measurement
+13.2.1 Predefined Job Chargebacks
+Some predefined chargebacks can be listed and configured under the chargeback submode of the wlm
+mode.
+   The predefined list is short:
+
+[basecm11->wlm[slurm]]% chargeback
+[basecm11->wlm[slurm]->chargeback]% list
+Name (key)                                 Group by user Group by account Price per CPU second
+------------------------------------------ ------------- ---------------- --------------------
+Jobs completed last month grouped by user yes            no               8.64$/d
+Jobs completed this month grouped by user yes            no               8.64$/d
+Jobs completed this year grouped by user   yes           no               8.64$/d
+
+Setting A Price For Resource Requests
+The pricing can be set per resource requests over a specified time period. In the preceding list, the period
+is a month or a year. The resource and associated resource request consumption can be the following
+pairs:
+
+                          Resource And Resource Request Consumption Pairs
+
+      Resource                                          Resource Request Consumption
+      CPU                                               CPU second
+
+      GPU                                               GPU second
+
+      CPU core                                          CPU core second
+
+      slot                                              slot second
+
+      memory bytes                                      byte-second
+
+
+    Different workload managers use different resources for resource measurement, which is why there
+is a variety in the resources that can be used for pricing.
+13.2 Job Chargeback Measurement                                                                  701
+
+13.2.2 Setting A Custom Job Chargeback
+In addition to the predefined job chargebacks, more chargebacks can be added. For example, the number
+of jobs completed so far today can be set up as follows:
+
+Example
+
+[basecm11->wlm[slurm]->chargeback]% add "Jobs completed this day grouped by user"
+[basecm11->...ck*[Jobs completed this day grouped by user*]]% show
+Parameter                        Value
+-------------------------------- ------------------------------------------------
+Name                             Jobs completed this day grouped by user
+Revision
+Notes                            <0B>
+Group by user                    no
+Group by group                   no
+Group by account                 no
+Group by job name                no
+Group by job ID                  no
+Group by parent ID               no
+Users
+Groups
+Accounts
+Job names
+Job IDs
+Parent IDs
+Price per CPU second             0.00$/s
+Price per CPU core second        0.00$/s
+Price per GPU second             0.00$/s
+Price per memory byte-second     0$/B*s
+Price per slot second            0$/slot*s
+Currency                         $
+Start time
+End time
+UTC                              no
+Include running                  no
+Calculate prediction             no
+
+[basecm11->...ck*[Jobs completed this day grouped by user*]]% set pricepercpusecond 0.0001$/s
+[basecm11->...ck*[Jobs completed this day grouped by user*]]% set groupbyuser yes
+[basecm11->...ck*[Jobs completed this day grouped by user*]]% set starttime now/d
+[basecm11->...ck*[Jobs completed this day grouped by user*]]% set endtime now/d
+[basecm11->...ck*[Jobs completed this day grouped by user*]]% commit
+
+Chargeback Groupings
+The grouping for the new chargeback Jobs completed this day grouped by user is set to be Group
+by user. Grouping by user is a common grouping, because finding resource use by an individual user
+is typically the most useful case. Grouping is possible by:
+
+   • user
+
+   • group
+
+   • account
+
+   • job name
+
+   • job ID
+702                                                                      Monitoring: Job Chargeback
+
+   • parent ID
+   After setting up chargebacks to suit the needs of the cluster administrator, queries can be made and
+reports can be generated using chargebacks. The report and request commands (section 13.2.3) are
+used for this.
+
+13.2.3 The report And request Commands
+Continuing on with the chargeback jobs completed this day grouped by user created in sec-
+tion 13.2.2, the report and request commands can be used after CPU request data values have been
+gathered on the jobs being run.
+
+The report Command And Its Options
+The report command displays a table of the number of jobs that were run per grouping for a chargeback,
+alongside the resource use and cost for each grouping.
+   Thus, some time after running jobs in Slurm, the report output for the chargeback created earlier,
+jobs completed this day grouped by user, might look as follows (some columns elided for clarity):
+Example
+[basecm11->wlm[slurm]->chargeback[jobs completed this day grouped by user]]% report
+# Start - Tue Sep 8 00:00:00 2020 CEST (1599516000)
+# End - Tue Sep 8 23:59:59 2020 CEST (1599602399)
+User         Jobs         Runtime (s) CPU (s)       CPU ($)    ... Price ($)
+------------ ------------ ------------ ------------ ---------- ... ----------
+alice        17           7,806        7,806        0.78       ... 0.78
+bob          20           8,775        8,775        0.88       ... 0.88
+charlie      19           7,007        7,007        0.7        ... 0.7
+david        10           5,122        5,122        0.51       ... 0.51
+edgar        25           10,502       10,502       1.05       ... 1.05
+frank        21           8,289        8,289        0.83       ... 0.83
+
+      The help text for report command lists formatting options:
+[basecm11->wlm[slurm]->chargeback]% help report
+Name:
+          report - Create charge back report
+
+Usage:
+             report [options] <name>
+
+Options:
+             -d, --delimiter
+                  Set default row separator
+
+             -v, --verbose
+                  Be more verbose: multiline table
+
+             --start
+                  Pagination start offset
+
+             --limit
+                  Pagination result limit
+
+The request Command And Its Options
+The request command lists the chargeback resources requested for a workload manager.
+   The request command can be run without options. In that case the output shows the resource
+request consumption for the chargeback, for the jobs over the period associated with that chargeback:
+13.2 Job Chargeback Measurement                                                              703
+
+Example
+[basecm11->wlm[slurm]->chargeback[jobs completed this day grouped by user]]% request
+# Start - Sun Sep 13 00:00:00 2020 CEST (1599948000)
+# End - Sun Sep 13 23:59:59 2020 CEST (1600034399)
+Jobs         Runtime (s) CPU (s)       Core (s)     GPU (s)      Slots (s)    Memory (B*s)
+------------ ------------ ------------ ------------ ------------ ------------ ------------
+5            1,765        1,765        0             0           0            0
+
+   The help text for request lists formatting, grouping, pricing, and filtering options:
+[basecm11->wlm[slurm]->chargeback]% help request
+Name:
+          request - Chargeback report for workload
+
+Usage:
+
+           request [options]
+
+Options:
+           -u, --group-by-user
+                group by username
+
+           --filter-user <user>[,<user>,...]
+                filter on specified users
+
+           -g, --group-by-group
+                group by group name
+
+           --filter-group <group>[,<group>,...]
+                filter on specified groups
+
+           -a, --group-by-account
+                group by account
+
+           --filter-account <account>[,<account>,...]
+                filter on specified accounts
+
+           -j, --group-by-job-name
+                group by job name
+
+           --filter-job-name <job-name>[,<job-name>,...]
+                filter on specified job names
+
+           -i, --group-by-job-id
+                group by job id
+
+           --filter-job-id <job-id>[,<job-id>,...]
+                filter on specified job ids
+
+           -p, --group-by-parentid
+                group by parent id
+
+           --filter-parent-id <parent-id>[,<parent-id>,...]
+                filter on specified parent-ids
+
+           --price-per-cpu-second
+704                                                                        Monitoring: Job Chargeback
+
+                  Price per CPU second
+
+             --price-per-cpu-core-second
+                  Price per CPU core second
+
+             --price-per-gpu-second
+                  Price per GPU second
+
+             --price-per-gpu-second
+                  Price per GPU second
+
+             --price-per-memory-byte-second
+                  Price per memory byte * second
+
+             --price-per-slot-second
+                  Price per slot second
+
+             --currency
+                  Change the currency in which the price is displayed (default $)
+
+             --include-running
+                  include running jobs in charge back report (prices will not be final)
+
+             --calculate-prediction
+                  calculate a prediction for an incomplete time frame
+
+             -d, --delimiter
+                  Set default row separator
+
+             --sort <field1>[,<field2>,...]
+                  Override default sort order
+
+             --start-time, -s <time>
+                  Start time in Prometheus format
+
+             --end-time, -e <time>
+                  End time in Prometheus format, falls back to start-time if not specified
+
+             --utc
+                  Use UTC instead of local time
+
+             --start
+                  Pagination start offset
+
+             --limit
+                  Pagination result limit
+
+             -v, --verbose
+                  Be more verbose
+
+Examples:
+             request                Chargeback report for workload for the current WLM
+             request default        Chargeback report for workload for default
+
+
+      For example, using epoch times to specify the start and end times, and grouping by user:
+13.2 Job Chargeback Measurement                                                                    705
+
+Example
+
+[basecm11->wlm[slurm]->chargeback[jobs completed this day grouped by user]]% request -s \
+1599948000 -e 1600034399 -u
+# Start - Sun Sep 13 00:00:00 2020 CEST (1599948000)
+# End - Sun Sep 13 23:59:59 2020 CEST (1600034399)
+User      Jobs Runtime (s) CPU (s)        Core (s) GPU (s)     Slots (s)    Memory (B*s)
+--------- ----- ------------ ------------ --------- ---------- ------------ ------------
+alice     1     398          398          0          0         0            0
+david     2     1,041        1,041        0         0          0            0
+edgar     1     325          325          0          0         0            0
+frank     1     1            1            0         0          0            0
+
+   Another way of duplicating the output of request without options, is to explicitly specify the de-
+fault values. For the chargeback jobs completed this day grouped by user, which was set up in
+section 13.2.2. it corresponds to a start time of now/d and an end time of now/d:
+
+Example
+
+[basecm11->...eback[jobs completed this day grouped by user]]% request
+# Start - Tue Sep 15 00:00:00 2020 CEST (1600120800)
+# End - Tue Sep 15 23:59:59 2020 CEST (1600207199)
+Jobs         Runtime (s) CPU (s)       Core (s)     GPU (s)      Slots (s)    Memory (B*s)
+------------ ------------ ------------ ------------ ------------ ------------ ------------
+56           72,374       72,374       0            0            0            0
+[basecm11->...eback[jobs completed this day grouped by user]]% request -s now/d -e now/d
+# Start - Tue Sep 15 00:00:00 2020 CEST (1600120800)
+# End - Tue Sep 15 23:59:59 2020 CEST (1600207199)
+Jobs         Runtime (s) CPU (s)       Core (s)     GPU (s)      Slots (s)    Memory (B*s)
+------------ ------------ ------------ ------------ ------------ ------------ ------------
+56           72,374       72,374       0            0            0            0
+
+   Users can be added to the table with the -u option (some output is truncated here for clarity in the
+examples that follow):
+
+Example
+
+[basecm11->...eback[jobs completed this day grouped by user]]% request -u
+# Start - Tue Sep 15 00:00:00 2020 CEST (1600120800)
+# End - Tue Sep 15 23:59:59 2020 CEST (1600207199)
+User         Jobs         Runtime (s) CPU (s)       Core (s)     GPU (s)
+------------ ------------ ------------ ------------ ------------ ------------
+alice        16           19,538       19,538       0            0
+bob          7            15,158       15,158       0            0
+charlie      6            6,056        6,056        0            0
+david        3            1,636        1,636        0            0
+edgar        15           16,475       16,475       0            0
+frank        9            13,511       13,511       0            0
+
+   A jobs drilldown can be carried out with -j.
+
+Example
+
+[basecm11->wlm[slurm]->chargeback[jobs completed this day grouped by user]]% request       -j
+# Start - Tue Sep 15 00:00:00 2020 CEST (1600120800)
+# End - Tue Sep 15 23:59:59 2020 CEST (1600207199)
+Job name       Jobs         Runtime (s) CPU (s)       Core (s)     GPU (s)
+706                                                                            Monitoring: Job Chargeback
+
+-------------- ------------ ------------ ------------ ------------ ------------
+data-transfer 15            49,248       49,248       0            0
+iozone         19           9,918        9,918        0            0
+sleep          22           13,208       13,208       0            0
+
+      The jobs drilldown can be carried out for a particular user, alice, using the filter option:
+
+Example
+
+[basecm11->...grouped by user]]% request -j --filter-user alice
+# Start - Tue Sep 15 00:00:00 2020 CEST (1600120800)
+# End - Tue Sep 15 23:59:59 2020 CEST (1600207199)
+Job name       Jobs         Runtime (s) CPU (s)       Core (s)     GPU (s)
+-------------- ------------ ------------ ------------ ------------ ------------
+data-transfer 5             13,404       13,404       0            0
+iozone         6            3,132        3,132        0            0
+sleep          5            3,002        3,002        0            0
+
+      This can have the user fields added for the case when several users are specified, as follows:
+
+Example
+
+[basecm11->...grouped by user]]% request -s now/d -e now/d -u -j --filter-user alice,bob,charlie
+# Start - Tue Sep 15 00:00:00 2020 CEST (1600120800)
+# End - Tue Sep 15 23:59:59 2020 CEST (1600207199)
+User         Job name       Jobs         Runtime (s) CPU (s)       Core (s)     GPU (s)
+------------ -------------- ------------ ------------ ------------ ------------ ------------
+alice        data-transfer 5             13,404       13,404       0            0
+alice        iozone         6            3,132        3,132        0            0
+alice        sleep          5            3,002        3,002        0            0
+bob          data-transfer 3             12,842       12,842       0            0
+bob          iozone         1            516          516          0            0
+bob          sleep          3            1,800        1,800        0            0
+charlie      data-transfer 1             3,212        3,212        0            0
+charlie      iozone         2            1,044        1,044        0            0
+charlie      sleep          3            1,800        1,800        0            0
+[basecm11->wlm[slurm]->chargeback[jobs completed this day grouped by user]]%
+
+      As the help text for request suggests, there are many more combinations possible.
+
+
+13.3      Job Chargeback Background Information
+Because users can run large numbers of jobs per day, the storage requirement for chargeback records
+can be very large indeed. For this reason, a cache is kept in memory, and flushed to storage in a MySQL
+database.
+   CMDaemon AdvancedConfig directives for configuring the MySQL storage for chargebacks are:
+
+   • JobInformationChargeBackKeepDuration (page 898)
+
+   • JobInformationChargeBackKeepCount (page 898)
+
+   • JobInformationChargeBackRemoveInterval (page 899)

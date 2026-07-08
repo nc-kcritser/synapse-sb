@@ -1,0 +1,423 @@
+                                                                                   11
+               Chapter 11 - Monitoring: Job Monitoring
+11.1    Job Metrics Introduction
+Most HPC administrators set up device-centric monitoring to keep track of cluster node resource use.
+This means that metrics are selected for devices, and the results can then be seen over a period of time.
+The results can be viewed as a graph or data table, according to the viewing option chosen. This is
+covered in Chapter 10.
+    The administrator can also select a job that is currently running, or that has recently run, and get
+metrics for nodes, memory, CPU, storage, and other resource use for the job. This is known as job
+monitoring, which is, as the term suggests, about job-centric rather than device-centric monitoring. Job
+monitoring is covered in this chapter, and uses job metrics.
+    For perspective, monitoring as discussed until now has been based on using devices or jobs as the
+buckets for which resource use values are gathered. Administrators can also gather, for resources con-
+sumed by jobs, the resources used by users (or any other classifier entity) as the buckets for the values,
+with the help of promQL-based queries. This is typically useful for watching over the resources used
+by a user (or other classifier entity) when jobs are run on the cluster. User-centric monitoring—or more
+generally, PromQL-based classifier-centric monitoring—for jobs is termed job accounting and is covered
+in Chapter 12.
+
+
+11.2    Job Metrics With Cgroups
+Job metrics collection uses control groups (cgroups), (section 7.10). Each job is associated with a spe-
+cific cgroup that is created in each of the three base cgroups that are associated with particular cgroup
+controllers. The cgroup controllers are kernel components that allow metrics to be collected for pro-
+cesses. The PIDs of these processes are in the cgroups tasks file.
+    NVIDIA Base Command Manager 11 uses the following cgroup controllers:
+
+   • blkio: provides block device metrics,
+
+   • cpuacct: provides CPU usage metrics,
+
+   • memory: provides memory usage metrics.
+
+     In NVIDIA Base Command Manager before version 9.1, each job had to be put by a workload man-
+ager into a unique cgroup. However, from NVIDIA Base Command Manager 9.1 onward, this no longer
+necessary. By default, BCM still configures all supported workload managers to run jobs in cgroups, but
+it is now CMDaemon that manages the cgroup life cycle. Thus, CMDaemon ensures that:
+
+   • the necessary cgroups are created per job
+
+   • ensures that the cgroups are removed after the job is finished
+
+   • and that the last values of the metrics are collected.
+662                                                                        Monitoring: Job Monitoring
+
+Even if the administrator completely disables cgroups management in the workload manager, CMDae-
+mon can still create and remove the three cgroups associated with the job, with each of those cgroups
+associated with one of the three previously-mentioned cgroup controllers.
+    If the workload manager creates some (or all three) cgroups for a job, then CMDaemon does not try
+to recreate the cgroup, but does take charge of the removal of cgroups.
+    In NVIDIA Base Command Manager before version 9.1, cm-wlm-setup configured systemd to use a
+joined cgroup with the following parameter settings:
+
+Example
+
+[root@node001 ~]# grep JoinControllers /etc/systemd/system.conf
+JoinControllers=blkio,cpuacct,memory,freezer
+[root@node001 ~]#
+
+Currently this is not needed. However, if this setting remains, then CMDaemon can still collect job
+metrics. In order to reset the cgroup layout to the default one, the administrator can run:
+
+cm-wlm-setup --reset-cgroups
+
+   This command removes the JoinControllers parameter and regenerates initrd. A reboot of the
+nodes is required after this.
+   When a job is started CMDaemon detects all the job processes. CMDaemon then ensures that the
+required cgroups are created, and allocates the detected processes to those cgroups. CMDaemon does
+not configure the cgroups in any way—this is the responsibility of the workload manager.
+   The tables in Appendix G.1.8 list the job metrics that BCM can monitor and visualize.
+   If job metrics are set up (section 11.4), then:
+  1. on virtual machines, block device metrics may be unavailable because of virtualization.
+
+  2. for now, the metrics are retrieved from cgroups created by the workload manager for each job.
+     When the job is finished the cgroup is removed from the filesystem along with all the collected
+     data. Retrieving the jobs metric data therefore means that CMDaemon must sample the cgroup
+     metrics before the job is finished. If CMDaemon is not running during a time period for any reason,
+     then the metrics for that time period cannot be collected, even if CMDaemon starts later.
+
+  3. block device metrics are collected for each block device by default. Thus, if there are N block
+     devices, then there are N collected block device metrics. The monitored block devices can be
+     excluded by configuration as indicated in section 11.4.
+
+
+11.3      Job Information Retention
+Each job adds a set of metric values to the monitoring data. The longer a job runs, the more data is
+added to the data. By default, old values are cleaned up from the database in order to limit its size. In
+NVIDIA Base Command Manager 11 there are several advanced configuration directives to control the
+job data retention, with names and default values as follows:
+
+       Advanced Configuration Directive         Default value    Unit
+       JobInformationDisabled                   0
+       JobInformationKeepDuration               2419200          s
+       JobInformationKeepCount                  8192
+       JobInformationMinimalJobDuration         0                s
+       JobInformationFlushInterval              600              s
+
+      These directives are described in detail in Appendix C, page 897.
+11.4 Job Metrics Sampling Configuration                                                                 663
+
+11.4    Job Metrics Sampling Configuration
+Job metrics sampling can be configured to varying degrees. For clusters where hundreds of thousands
+of jobs are run in a day it often makes little sense to monitor jobs, and it is often helpful to disable the
+JobSampler and JobMetadataSampler data producers:
+
+Example
+
+[basecm11]% monitoring setup
+[basecm11->monitoring->setup]% set jobsampler disabled yes
+[basecm11->monitoring->setup]% set jobmetadatasampler disabled yes
+[basecm11->monitoring->setup]% commit
+
+   An alternative is to use the equivalent CMDaemon directive JobInformationDisabled, as explained
+on page 637.
+   If however CMDaemon is to keep the monitoring data, then the collection of job metrics is carried
+out from the cgroups in which a job runs. The administrator can tune some low level metric collection
+options for the JobSampler data producer in the jobmetricsettings submode:
+
+Example
+
+[basecm11]% monitoring setup
+[basecm11->monitoring->setup]% use jobsampler
+[basecm11->monitoring->setup[JobSampler]% jobmetricsettings
+[basecm11->monitoring->setup[JobSampler]->jobmetricsettings]% show
+Parameter                        Value
+-------------------------------- ------------------------------------------------
+Revision
+Exclude devices                  loop,sr
+Include devices
+Enable advanced metrics          no
+Exclude metrics
+Include metrics
+Sampling Type                    Both
+Map jobs to GPUs                 yes
+CGroup base directory            /sys/fs/cgroup
+Keep alive sleep                 8w
+Pickup interval                  5s
+Pickup times                     12
+Pickup priority                  50
+
+
+   The configuration parameters are:
+
+ Parameter Name                       Description
+ Exclude devices                      Block devices for which job metrics will not collect metrics
+
+ Include devices                      If the list is not empty then only block device metrics for
+                                      these devices will be collected, while for other devices the
+                                      metrics will be skipped
+
+
+                                                                                        ...continues
+664                                                                         Monitoring: Job Monitoring
+
+                                            ...continued
+ Parameter Name                      Description
+ Enable advanced metrics             Indicates whether advanced job metrics should be enabled
+                                     (default: no)
+
+ Exclude metrics                     List of metric names that should not be collected
+
+ Include metrics                     List of metric names that should be added to metric
+                                     collection
+
+ Sampling Type                       Type of metric sampling (default: both). The value can be
+                                     bright, prometheus, or both. Setting it to bright disables
+                                     Prometheus sampling, while setting it to prometheus dis-
+                                     ables sampling by BCM metrics
+
+ Map jobs to GPUs                    Associate the job with GPUs where the job processes run,
+                                     where possible (default: yes)
+
+ CGroup base directory               Cgroup base directory (default: /sys/fs/cgroup)
+
+ Keep alive sleep                    Time the cgroup keepalive process sleeps (default: 8
+                                     weeks)
+
+ Pickup interval                     Initially higher pickup interval (default: 5s). By default
+                                     this settles down to the normal pickup interval (with a
+                                     default of 120s) after the value of Pickup times has been
+                                     exceeded.
+
+ Pickup times                        Number of times to apply the initially higher pickup inter-
+                                     val (default: 12)
+
+ Pickup priority                     Priority of the pickup interval change (default: 50)
+
+
+    The amount of monitoring data gathered can also be reduced by reducing the Maximal age and
+Maximal samples for data producers (section 10.4.1) to smaller, but still non-zero values. A way to do
+this is described in section 14.8.4.
+
+11.4.1 The Job Metrics Collection Processing Mechanism
+The cm-cgroup-job-keepalive Process
+From NVIDIA Base Command Manager 9.0 onward, when a WLM job starts, CMDaemon tracks the
+moment it starts and finishes, and is able to collect metrics for it. As part of this enhanced jobs metrics
+collection, a keepalive process, cm-cgroup-job-keepalive, is run for each job. Each keepalive process
+is a temporary process, and is added by CMDaemon to the same cgroup that the original job was placed
+in by the WLM.
+    The process cm-cgroup-job-keepalive itself does no work. It sleeps, and by existing it prevents its
+cgroup being deleted.
+    After a job is finished, the workload manager would normally remove the related cgroup. However
+11.5 Job Monitoring In cmsh                                                                          665
+
+the existence of the cm-cgroup-job-keepalive process prevents the deletion. This allows CMDaemon
+to collect the very last metrics data for the job from the cgroup when the job finishes. The CMDaemon
+then stops the cm-cgroup-job-keepalive process, and the cgroup is then removed because it is no
+longer needed.
+    When CMDaemon starts the cm-cgroup-job-keepalive process for a job, it passes the appropri-
+ate job ID, and how long it can run, in its command line options. Those values are not used by the
+cm-cgroup-job-keepalive process itself, but they are convenient for seeing what job the process is run-
+ning for, and how long the job has run since it was started. For example, for a Slurm job with id 2 the
+running cgroup keeper process could look like:
+
+Example
+[root@node001 ~]# ps auxf | tail -n 10 | cut -b18-45 --complement
+root      1954 0 Sl     18:12   0:03 _ /cm/local/apps/cmd/sbin/cmd -s -n -P /var/run/cmd.pid
+root      2632 0 Ss     18:15   0:00      _ /cm/local/apps/cmd/sbin/cm-cgroup-job-keepalive --job 2 8w
+root      2241 0 S      18:13 0:00 /cm/shared/apps/slurm/18.08.4/sbin/slurmd
+root      2627 0 Sl     18:15   0:00 slurmstepd: [2.batch]
+cmsuppo+ 2631 0 S       18:15   0:00 _ /bin/bash /cm/local/apps/slurm/var/spool/job00002/slurm_script
+cmsuppo+ 2642 0 S       18:15   0:00      _ /cm/shared/apps/stresscpu/current/stresscpu2
+cmsuppo+ 2643 0 S       18:15   0:00          _ /cm/shared/apps/stresscpu/current/stresscpu2
+cmsuppo+ 2644 98 R      18:15   4:46              _ /cm/shared/apps/stresscpu/current/stresscpu2
+[root@node001 ~]#
+
+   (The cut command is just used in the example to cut out the middle bits of the output so that it fits
+the page format well).
+
+The Keep Alive Sleep Time
+By default the cgroup keeper process stops after 8 weeks. This value should be increased if the jobs
+that are expected to run will take longer than 8 weeks. The value can be set in the Keep Alive Sleep
+parameter of the job metrics settings. If a job runs for longer than the value of Keep Alive Sleep,
+then CMDaemon cannot collect the very last metrics (from around the time that the job has finished).
+However all other metrics will be collected for the job as expected, even if the job running time exceeds
+the Keep Alive Sleep time.
+
+The OOB intervals Parameter
+When metric collection for a new job has just started, CMDaemon samples more frequently than later
+on. This more frequent sampling behaviour is defined by the parameter OOB intervals (out of band
+sampling interval) in the data producer configuration. In the case of job metrics collection this more
+frequent sampling behaviour is in JobSampler.
+    By default, the sampling interval retuns to the standard Interval value (with a default value of
+120s), as defined in the data producer settings, after the value of Pickup times (with a default value of
+12) has been exceeded.
+
+   The parameter Exclude Metrics can be used to exclude metrics that are currently enabled. For
+example, if advanced metrics collection is enabled then Exclude Metrics allows either default or ad-
+vanced metrics to be excluded by name.
+
+
+11.5    Job Monitoring In cmsh
+The following commands are associated with monitoring job measurables within jobs submode (cmsh
+> wlm<[workload manager]> > jobs, section 7.7):
+
+The measurables Command
+A list of job-associated measurables can be seen in the jobs submode (cmsh > [<workload manager]> >
+jobs) using the measurables command with a job ID. For example (much output elided):
+666                                                                          Monitoring: Job Monitoring
+
+Example
+
+[basecm11->wlm[slurm]->jobs]% measurables 26
+blkio.io_service_bytes_total
+...
+memory.usage
+[basecm11->wlm[slurm]->jobs]%
+
+      A list of node-associated measurables can also be seen if the -n option is used (much output elided):
+
+Example
+
+[basecm11->wlm[slurm]->jobs]% measurables -n 26
+...
+gpu_power_usage:gpu0
+...
+memory.usage
+
+The filter Command
+The filter command uses options to provide filtered historic job-related information. It does not pro-
+vide measurables data. The command and its options can be used to:
+
+   • retrieve running, pending, failed or finished jobs information
+
+   • select job data using regular expressions to filter by job ID
+
+   • list jobs by user name, user group, or workload manager
+
+    Running filter without options simply lists an unfiltered list.
+    Filtering on a job name can be done with the -n|--name option, and the --limit option can be used
+to limit the number of results displayed:
+
+Example
+
+[basecm11->wlm[slurm]->jobs]% filter -n mgbench --ended --limit 2
+Job ID Job name User Queue Submit time      Start time      End time        Nodes   Exit code
+------ -------- ----- ----- --------------- --------------- --------------- ------- ---------
+26     mgbench alice defq May 14 11:21:41 May 14 11:36:36 May 14 11:50:24 node001 0
+27     sleep    bob defq May 14 11:23:00 May 14 11:50:24 May 14 12:00:25 node001 0
+[basecm11->wlm[slurm]->jobs]%
+
+    The data shown is retrieved from the running workload manager, as well as from the accounting file
+or database maintained by the workload manager.
+    Further details on the options to filter can be seen by running help filter.
+
+The info Command
+A handy command to obtain job information is info, followed by the job number:
+
+Example
+
+[basecm11->wlm[slurm]->jobs]% info 25
+Parameter                        Value
+-------------------------------- ---------------------------------------------------
+Job ID                           25
+Revision                         stdin:/dev/null+
+Job name                         data-transfer
+User                             frank
+Group                            frank
+11.5 Job Monitoring In cmsh                                                                         667
+
+Account
+Parent ID
+WlmCluster                          slurm
+Queue                               defq
+Nodes                               node002
+Submit time                         09/02/2023 12:06:56
+Start time                          09/02/2023 12:16:57
+End time                            09/02/2023 12:16:57
+Persistent                          no
+Exit code                           0
+Status                              COMPLETED
+Requested CPUs                      1
+Requested CPU cores                 0
+Requested GPU                       0
+Requested memory                    976KiB
+Requested slots                     0
+Monitoring                          yes
+Comment
+[basecm11->wlm[slurm]->jobs]%
+
+The dumpmonitoringdata Command
+The dumpmonitoringdata command displays data for measurables in the jobs submode (cmsh >
+[<workload manager]> > jobs). It is a very similar to the dumpmonitoringdata command for measur-
+ables in device mode (section 10.6.4). The main difference in the behavior of dumpmonitoringdata for
+these modes is that:
+
+   • In the jobs submode it shows monitoring data over a period of time for a specified job ID
+
+   • In device mode (cmsh > device) it shows monitoring data over a period of time for a specified
+     device.
+
+   A less obvious difference is that:
+
+   • In the jobs submode the start and end time for the monitoring data for the job does not need to be
+     specified. By default the start and end time of the job is assumed.
+
+   • In device mode the start and end time for the monitoring data for the device must be specified
+
+   The usage of the dumpmonitoringdata command for job measurables is:
+
+   dumpmonitoringdata [OPTIONS] [<start-time> <end-time>] <measurable> <job ID>
+
+Options allow measurables to be retrieved and presented in various ways, including by maximum
+value, raw or interpolated data, and human-friendly forms. The user can also specify custom periods
+for the options.
+    For example, a historical job with job ID 4 that uses nodes node001 and node002 might display output
+for the job-associated measurable memory.usage as follows:
+
+Example
+
+[basecm11->wlm[slurm]->jobs]% dumpmonitoringdata memory.usage 4
+Start: Wed Feb 8 20:07:54 2023
+End:   Wed Feb 8 20:07:55 2023
+Nodes: node001,node002
+Entity       Timestamp                  Value      Info
+------------ -------------------------- ---------- ----------
+668                                                                        Monitoring: Job Monitoring
+
+node001      2023/02/08 20:07:54.586        0 B
+node001      2023/02/08 20:07:55            621 KiB
+node002      2023/02/08 20:07:54.888        160 KiB
+node002      2023/02/08 20:07:55            632 KiB
+[basecm11->wlm[slurm]->jobs]%
+
+The start and end times are optional, so specifying them is typically unnecessary. If they are not speci-
+fied, then the data values that were found over the entire period of the job run are displayed.
+    That job with ID 26, for the example used in this section 11.5, happens to be mgbench, a GPU
+benchmarking program that runs on nodes. So displaying output for the node-associated measurable,
+gpu_power_usage, during the job run can also be useful:
+
+Example
+
+[basecm11->wlm[slurm]->jobs]% dumpmonitoringdata gpu_power_usage:gpu0 26
+Start: Thu May 14 11:36:36 2020
+End:   Thu May 14 11:50:24 2020
+Nodes: node001
+Timestamp                  Value      Info
+-------------------------- ---------- ----------
+2020/05/14 11:36:36        no data
+2020/05/14 11:37:03.883    195.58 W
+...
+2020/05/14 11:50:23.887    22.224 W
+2020/05/14 11:50:24        22.2241 W
+[basecm11->wlm[slurm]->jobs]%
+
+   The data is shown per node if the job uses several nodes.
+   Further details of the options to dumpmonitoringdata for job metrics can be seen by running help
+dumpmonitoringdata within jobs mode.
+
+The statistics Command
+The statistics command shows basic statistics for historical job information. It allows statistics to be
+filtered per user or user group, and workload manager. The statistics can be grouped by hour, day, week
+or a custom interval.
+
+Example
+
+[basecm11->wlm[slurm]->jobs]% statistics
+Queued     Running    Finished   Error      Nodes
+---------- ---------- ---------- ---------- ----------
+24         1          25         4          34
+[basecm11->wlm[slurm]->jobs]%
+
+      Further details of the options to statistics can be seen by running help statistics.

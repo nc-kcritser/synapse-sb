@@ -1,0 +1,578 @@
+                                                                                            E
+                           Example initialize and finalize Scripts
+The node-installer executes any initialize and finalize scripts at particular stages of its 13-step run
+during node-provisioning (section 5.4). They are sometimes useful for troubleshooting or workarounds
+during those stages. The scripts are stored in the CMDaemon database, rather than in the filesystem
+as plain text files, because they run before the node’s init process takes over and establishes the final
+filesystem.
+    Default initialize and finalize scripts are provided with the default category:
+
+[basecm11->category[default]]% show | grep ize
+Initialize script                <1.46KiB>
+Finalize script                  <3.4KiB>
+
+
+E.1    When Are They Used?
+The initialize and finalize scripts are sometimes used as an alternative configuration option out of
+a choice of other possible options (section 3.20.1). As a solution it can be a bit of a hack, but sometimes
+there is no reasonable alternative other than using an initialize or finalize script.
+
+An initialize script: is used well before the init process starts, to execute custom commands before
+partitions and mounting devices are checked. Typically, initialize script commands are related to
+partitioning, mounting, or initializing special storage hardware. Often an initialize script is needed
+because the commands in it cannot be stored persistently anywhere else.
+
+A finalize script: (also run before init, but shortly before init starts) is used to set a file configu-
+ration or to initialize special hardware, sometimes after a hardware check. It is run in order to make
+software or hardware work before, or during the later init stage of boot. Thus, often a finalize script
+is needed because its commands must be executed before init, and the commands cannot be stored
+persistently anywhere else, or it is needed because a choice between (otherwise non-persistent) config-
+uration files must be made based on the hardware before init starts.
+
+
+E.2    Accessing From Base View And cmsh
+The initialize and finalize scripts are accessible for viewing and editing:
+
+   • In Base View, via the Node Categories or Nodes window, under the Settings window. The navi-
+     gation paths for these are:
+
+        – Grouping > Node categories[default] > Edit > Settings
+942                                                           Example initialize And finalize Scripts
+
+           – Devices > Nodes[node001] > Edit > Settings
+
+   • In cmsh, using the category or device modes. The get command is used for viewing the script,
+     and the set command to start up the default text editor to edit the script. Output is truncated in
+     the two following examples at the point where the editor starts up:
+
+        Example
+
+        [root@basecm11 ~]# cmsh
+        [basecm11]% category use default
+        [basecm11->category[default]]% show | grep script
+        Parameter                      Value
+        ------------------------------ ------------------------------------------------
+        Finalize script                <1367 bytes>
+        Initialize script              <0 bytes>
+        [basecm11->category[default]]% set initializescript
+
+        Example
+
+        [basecm11]% device use node001
+        [basecm11->device[node001]]%
+        [basecm11->device[node001]]% set finalizescript
+
+
+E.3      Environment Variables Available To initialize And finalize Scripts
+When CMDaemon is fully up, the environment variables available to CMDaemon scripts are fully avail-
+able and can be listed by the CMDaemon front-ends (page 78).
+    That full range of environment variables is not available for initialize and finalize scripts, since
+only a subset of the full environment is defined during the stages associated with the scripts.
+    For the initialize and finalize scripts, node-specific customizations can still be made from a
+script using the environment variables that are available. For initialize scripts, this is discussed
+briefly in section E.5.1.
+    For finalize scripts, the available environment variables can be listed using the following script as a
+finalizescript:
+
+Example
+
+[basecm11->device[node001]]% get finalizescript
+#!/bin/bash
+#
+# All cluster manager environment variables are prefixed with CMD_
+# The root / of the running node is always mounted on /localdisk
+#
+
+set | grep CMD_ > /localdisk/var/log/node-installer-finalize.env
+
+      After the node comes up, the contents of the saved file on that node are the available variables:
+
+Example
+
+[root@node001 ~]# cat /var/log/node-installer-finalize.env
+CMD_ACTIVE_MASTER_IP=10.141.255.254
+CMD_CATEGORY=default
+CMD_CHASSIS=
+CMD_CHASSIS_IP=0.0.0.0
+E.3 Environment Variables Available To initialize And finalize Scripts                                 943
+
+CMD_CHASSIS_PASSWORD=
+CMD_CHASSIS_SLOT=
+CMD_CHASSIS_USERNAME=
+...
+
+   The following table shows the available variables with some example values:
+
+               Table E: Environment Variables For The initialize And Finalize Scripts
+ Variable                                                            Example Value
+ CMD_ACTIVE_MASTER_IP                                                10.141.255.254
+ CMD_CATEGORY                                                        default
+ CMD_CHASSIS                                                         chassis01
+ CMD_CHASSIS_IP                                                      10.141.1.1
+ CMD_CHASSIS_PASSWORD                                                ADMIN
+ CMD_CHASSIS_SLOT                                                    1
+ CMD_CHASSIS_USERNAME                                                ADMIN
+ CMD_CLUSTERNAME                                                     BCM HEAD Cluster
+ CMD_DEVICE_HEIGHT                                                   1
+ CMD_DEVICE_POSITION                                                 10
+ CMD_DEVICE_TYPE                                                     SlaveNode
+ CMD_ETHERNETSWITCH                                                  switch01:1
+ CMD_FSEXPORT__SLASH_cm_SLASH_node-installer_ALLOWWRITE              no
+ CMD_FSEXPORT__SLASH_cm_SLASH_node-installer_HOSTS                   10.141.0.0/16
+ CMD_FSEXPORT__SLASH_cm_SLASH_node-installer_PATH                    /cm/node-installer
+ CMD_FSEXPORTS                                                       _SLASH_cm_SLASH_node-installer
+ CMD_FSMOUNT__SLASH_cm_SLASH_shared_DEVICE                           master:/cm/shared
+ CMD_FSMOUNT__SLASH_cm_SLASH_shared_FILESYSTEM                       nfs
+ CMD_FSMOUNT__SLASH_cm_SLASH_shared_MOUNTPOINT                       /cm/shared
+ CMD_FSMOUNT__SLASH_cm_SLASH_shared_OPTIONS                          rsize=32768,wsize=32768,\
+                                                                     hard,intr,async
+ CMD_FSMOUNT__SLASH_dev_SLASH_pts_DEVICE                             none
+ CMD_FSMOUNT__SLASH_dev_SLASH_pts_FILESYSTEM                         devpts
+ CMD_FSMOUNT__SLASH_dev_SLASH_pts_MOUNTPOINT                         /dev/pts
+ CMD_FSMOUNT__SLASH_dev_SLASH_pts_OPTIONS                            gid=5,mode=620
+ CMD_FSMOUNT__SLASH_dev_SLASH_shm_DEVICE                             none
+ CMD_FSMOUNT__SLASH_dev_SLASH_shm_FILESYSTEM                         tmpfs
+ CMD_FSMOUNT__SLASH_dev_SLASH_shm_MOUNTPOINT                         /dev/shm
+ CMD_FSMOUNT__SLASH_dev_SLASH_shm_OPTIONS                            defaults
+ CMD_FSMOUNT__SLASH_home_DEVICE                                      master:/home
+ CMD_FSMOUNT__SLASH_home_FILESYSTEM                                  nfs
+                                                                                        ...continues
+944                                                          Example initialize And finalize Scripts
+
+ Table E: Environment Variables For The initialize And Finalize Scripts...continued
+ Variable                                     Example Value
+ CMD_FSMOUNT__SLASH_home_MOUNTPOINT           home
+ CMD_FSMOUNT__SLASH_home_OPTIONS              rsize=32768,wsize=32768,\
+                                              hard,intr,async
+ CMD_FSMOUNT__SLASH_proc_DEVICE               none
+ CMD_FSMOUNT__SLASH_proc_FILESYSTEM           proc
+ CMD_FSMOUNT__SLASH_proc_MOUNTPOINT           /proc
+ CMD_FSMOUNT__SLASH_proc_OPTIONS              defaults,nosuid
+ CMD_FSMOUNT__SLASH_sys_DEVICE                none
+ CMD_FSMOUNT__SLASH_sys_FILESYSTEM            sysfs
+ CMD_FSMOUNT__SLASH_sys_MOUNTPOINT            /sys
+ CMD_FSMOUNT__SLASH_sys_OPTIONS               defaults
+ CMD_FSMOUNTS ∗                               _SLASH_dev_SLASH_pts
+                                              _SLASH_proc _SLASH_sys
+                                              _SLASH_dev_SLASH_shm
+                                              _SLASH_cm_SLASH_shared
+                                              _SLASH_home
+ CMD_GATEWAY                                  10.141.255.254
+ CMD_HOSTNAME                                 node001
+ CMD_INSTALLMODE                              AUTO
+ CMD_INTERFACE_eth0_IP ∗∗                     10.141.0.1
+ CMD_INTERFACE_eth0_MTU ∗∗                    1500
+ CMD_INTERFACE_eth0_NETMASK ∗∗                255.255.0.0
+ CMD_INTERFACE_eth0_TYPE ∗∗                   physical
+ CMD_INTERFACES ∗                             eth0 eth1 eth2 ipmi0
+ CMD_IP                                       10.141.0.1
+ CMD_MAC                                      00:00:00:00:00:01
+ CMD_PARTITION                                base
+ CMD_PASSIVE_MASTER_IP                        10.141.255.253
+ CMD_PDUS
+ CMD_POWER_CONTROL                            custom
+ CMD_RACK                                     rack01
+ CMD_RACK_HEIGHT                              42
+ CMD_RACK_ROOM                                serverroom
+ CMD_ROLES                                    sgeclient storage
+ CMD_SHARED_MASTER_IP                         10.141.255.252
+ CMD_SOFTWAREIMAGE_PATH                       /cm/images/default-image
+ CMD_SOFTWAREIMAGE                            default-image
+ CMD_TAG                                      00000000a000
+ CMD_USERDEFINED1                             var1
+ CMD_USERDEFINED2                             var2
+                                                                        ...continues
+E.4 Using Environment Variables Stored In Multiple Variables                                           945
+
+            Table E: Environment Variables For The initialize And Finalize Scripts...continued
+ Variable     Example Value
+ * The value for this variable is a string with spaces, not an array. Eg:
+ CMD_FSMOUNTS="_SLASH_dev_SLASH_pts _SLASH_proc _SLASH_sys _SLASH_dev_SLASH_shm ..."
+ ** The name of this variable varies according to the interfaces available. So,
+ eth0 can be replaced by eth1, eth2, ipmi0, and so on.
+
+
+
+
+E.4    Using Environment Variables Stored In Multiple Variables
+Some data values, such as those related to interfaces (CMD_INTERFACES_*), mount points
+(CMD_FSMOUNT__SLASH_*) and exports (CMD_FSEXPORT__SLASH_cm__SLASH_node-installer_*) are
+stored in multiple variables. The following finalize script set for node001 shows how they can be used:
+
+Example
+
+[head->device*[node001*]]% get finalizescript
+#!/bin/bash
+echo "These are the interfaces:" >> /localdisk/env
+CMD_ENV=`env`
+function parser {
+   for s in TYPE IP NETMASK; do
+     echo $((grep CMD_INTERFACE_${1/:/-}_${s} | grep -Po "[\w.]+$") <<< "${CMD_ENV[@]}")
+   done
+}
+for interface in $CMD_INTERFACES
+do
+   read -r type ip mask <<< $(parser $interface)
+
+  echo $interface type=$type >> /localdisk/env
+  echo $interface ip=$ip >> /localdisk/env
+  echo $interface netmask=$mask >> /localdisk/env
+done
+
+    The technique of storage of values in a file under the path within the node of /localdisk/ is de-
+scribed later on in section E.5.2. When the node boots up and runs the finalize script, then files stored
+under /localdisk/, end up under the path of / after the node is fully up.
+    The detailed workings of the parser function in the preceding bash script are not easy, but the re-
+sult is that the parser function returns output so that the interface type, IP address, and netmask are
+listed for each interface. The parser works for physical interfaces, VLAN interfaces, and alias interfaces.
+For example, if there are two interfaces, eth0 and eth0:1, then the file env might be seen to have the
+following data:
+
+Example
+
+[root@head ~]# ssh node001 cat /env
+These are the interfaces:
+eth0 type=physical
+eth0 ip=10.141.0.1
+eth0 netmask=255.255.0.0
+eth0:1 type=alias
+eth0:1 ip=10.141.0.2
+eth0:1 netmask=255.255.0.0
+946                                                          Example initialize And finalize Scripts
+
+    For remotely mounted devices, the name of the environment variables for mount entries have the
+following naming convention:
+
+      Description            Naming Convention
+      volume                 CMD_FSMOUNT_<x>_DEVICE
+      mount point            CMD_FSMOUNT_<x>_MOUNTPOINT
+      filesystem type        CMD_FSMOUNT_<x>_FILESYSTEM
+      mount point options    CMD_FSMOUNT_<x>_OPTIONS
+
+   For the names, the entries <x> are substituted with the local mount point path, such as
+“/cm/shared”, but with the “/” character replaced with the text “_SLASH_”. So, for a local
+mount point path “/cm/shared”, the name of the associated volume environment variable becomes
+CMD_FSMOUNT__SLASH_cm_SLASH_shared_DEVICE.
+   A similar naming convention is applicable to the names of the environment variables for the export
+entries:
+
+      Description                  Naming Convention
+      exported system writable?    CMD_FSEXPORT_<y>_ALLOWWRITE
+      allowed hosts or networks    CMD_FSEXPORT_<y>_HOSTS
+      path on exporter             CMD_FSMOUNT_<y>_PATH
+
+    Here, the entry <y> is replaced by the file path to the exported filesystem on the exporting node. This
+is actually the same as the value of “CMD_FSMOUNT_<y>_PATH”, but with the “/” character replaced with
+the text “_SLASH_”.
+    The entries for the local mount values and the export values in the table in section E.3 are the default
+values for a newly installed cluster. If the administrator wishes to add more devices and mount entries,
+this is done by configuring fsexports on the head node, and fsmounts on the regular nodes, using Base
+View or cmsh (section 3.14).
+
+
+E.5     Storing A Configuration To A Filesystem
+E.5.1 Storing With Initialize Scripts
+The initialize script (section 5.4.5) runs after the install-mode type and execution have been deter-
+mined (section 5.4.4), but before unloading specific drivers and before partitions are checked and filesys-
+tems mounted (section 5.4.6). Data output cannot therefore be written to a local drive. It can however be
+written by the script to the tmpfs, but data placed there is lost quite soon, namely during the pivot_root
+process that runs when the node-installer hands over control to the init process running from the local
+drive. However, if needed, the data can be placed on the local drive later by using the finalize script
+to copy it over from the tmpfs.
+    Due to this, and other reasons, a finalize script is easier to use for an administrator than an
+initialize script, and the use of the finalize script is therefore preferred.
+
+E.5.2    Ways Of Writing A Finalize Script To Configure The Destination Nodes
+Basic Example—Copying A File To The Image
+For a finalize script (section 5.4.11), which runs just before switching from using the ramdrive to using
+the local hard drive, the local hard drive is mounted under /localdisk. Data can therefore be written to
+the local hard drive if needed, but is only persistent until a reboot, when it gets rewritten. For example,
+predetermined configuration files can be written from the NFS drive for a particular node, or they can
+be written from an image prepared earlier and now running on the node at this stage, overwriting a
+E.5 Storing A Configuration To A Filesystem                                                            947
+
+node-installer configuration:
+
+Example
+
+#!/bin/bash
+cp /etc/myapp.conf.overwrite /localdisk/etc/myapp.conf
+
+     This technique is used in a finalize script example in section 3.20.4, except that an append operation
+is used instead of a copy operation, to overcome a network issue by modifying a network configuration
+file slightly.
+     There are three important considerations for most finalize scripts:
+
+  1. Running A Finalize Script Without exit 0 Considered Harmful
+
+
+     Failed Finalize Script Logic Flow: For a default configuration without a finalize script, if PXE
+     boot fails from the network during node provisioning, the node then goes on to attempt booting
+     from the local drive via iPXE (section 5.1.2).
+     However, if the configuration has a finalize script, such as in the preceding example, and if the
+     finalize script fails, then the failure is passed to the node-installer.
+
+
+     Avoiding Remote Node Hang During A Finalize Script: exit 0 Recommended: If the node-
+     installer fails, then no attempt is made to continue booting, and the node remains hung at that
+     stage. This is usually undesirable, and can also make remote debugging of a finalize script annoy-
+     ing.
+     Adding an exit 0 to the end of the finalize script is therefore recommended, and means that an
+     error in the script will still allow the node-installer to continue with an attempt to boot from the
+     local drive.
+
+
+     Debugging Tips When A Node Hangs During A Finalize Script: If there is a need to understand
+     the failure, then if the node-installer hangs, the administrator can ssh into the node into the node-
+     installer environment, and run the finalize script manually to debug it. Once the bug has been
+     understood, the script can be copied over to the appropriate location in the head node, for nodes
+     or categories.
+     Additional aid in understanding a failure may be available by looking through the node-
+     installer logs. The debug mode for the node-installer can be enabled by setting debug=true in-
+     stead of debug=false in the file /cm/node-installer/scripts/node-installer.conf (for mul-
+     tiarch/multidistro configurations the path takes the form: /cm/node-installer-<distribution>-
+     <architecture>/scripts/node-installer.conf).
+     Another way to help debug a failure could be by setting custom event messages in the script, as
+     explained on page 652.
+
+  2. Protecting A Configuration File Change From Provisioning Erasure With excludelistupdate
+     In the preceding example, the finalize script saves a file /etc/myapp.conf to the destination nodes.
+     To protect such a configuration file from erasure, its file path must be covered in the second sublist
+     in the excludelistupdate list (section 5.6.1).
+
+  3. Finalize scripts cannot modify /proc, /sys, and /dev filesystems of end result on node directly.
+     The /proc, /sys, and /dev filesystems are unmounted after the finalize script is run before pivoting
+     into the root filesystem under the /localdisk directory, which means any changes made to them
+948                                                           Example initialize And finalize Scripts
+
+      are simply discarded. To change values under these filesystems on the node, an rc.local file
+      inside the software image can be used.
+      For example, if swappiness is to be set to 20 via the /proc filesystem, one way to do it is to set it in
+      the rc.local file:
+
+      Example
+
+      # cat /cm/images/<image-name>/etc/rc.local | grep -v # | grep .
+      echo 20 > /proc/sys/vm/swappiness
+      exit 0
+      # chmod 755 /cm/images/<image-name>/etc/rc.d/rc.local     # must be made executable
+
+      The preceding way of using rc.local set to run a command to modify the image just for illustra-
+      tion. A better way to get the same result in this case would be to not involve rc.local, but to add
+      a line within the /cm/images/<image-name>/etc/sysctl.conf file:
+
+
+      vm.swappiness = 20
+
+
+Copying A File To The Image—Decision Based On Detection
+Detection within a basic finalize script is useful extra technique. The finalize script example of
+section 3.20.4 does detection too, to decide if a configuration change is to be done on the node or not.
+   A further variation on a finalize script with detection is a script selecting from a choice of possible
+configurations. A symlink is set to one of the possible configurations based on hardware detection or
+detection of an environment variable. The environment variable can be a node parameter or similar,
+from the table in section E.3. If it is necessary to overwrite different nodes with different configurations,
+then the previous finalize script example might become something like:
+
+Example
+
+#!/bin/bash
+if [[ $CMD_HOSTNAME = node00[1-7] ]]
+   then ln -s /etc/myapp.conf.first /localdisk/etc/myapp.conf
+fi
+if [[ $CMD_HOSTNAME = node01[5-8] ]]
+   then ln -s /etc/myapp.conf.second /localdisk/etc/myapp.conf
+fi
+if [[ $CMD_HOSTNAME = node02[3-6] ]]
+   then ln -s /etc/myapp.conf.third /localdisk/etc/myapp.conf
+fi
+
+    In the preceding example, the configuration file in the image has several versions:
+/etc/myapp.conf.<first|second|third>. Nodes node001 to node007 are configured with the
+first version, nodes node015 to node018 with the second version, and nodes node023 to node026 with
+the third version. It is convenient to add more versions to the structure of this decision mechanism.
+
+Copying A File To The Image—With Environment Variables Evaluated In The File
+Sometimes there can be a need to use the CMDaemon environment variables within a finalize script to
+specify a configuration change that depends on the environment.
+    For example a special service may need a configuration file, test, that requires the hostname myhost,
+as a parameter=value pair:
+
+Example
+E.5 Storing A Configuration To A Filesystem                                                               949
+
+SPECIALSERVICEPARAMETER=myhost
+
+    Ideally the placeholder value myhost would be the hostname of the node rather than the fixed value
+myhost. Conveniently, the CMDaemon environment variable CMD_HOSTNAME has the name of the host as
+its value.
+    So, inside the configuration file, after the administrator changes the host name from its placeholder
+name to the environment variable:
+
+SPECIALSERVICE=${CMD_HOSTNAME}
+
+    then when the node-installer runs the finalize script, the file could be modified in-place by the finalize
+script, and ${CMD_HOSTNAME} be substituted by the actual hostname.
+    A suitable finalize Bash script, which runs an in-line Perl substitution, is the following:
+
+#!/bin/bash
+perl -p -i -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' /localdisk/some/directory/file
+
+    Here, /some/directory/file means that, if for example the final configuration file path for the node
+is to be /var/spool/test then the file name should be set to /localdisk/var/spool/test inside the
+finalize script.
+    The finalize script replaces all lines within the file that have environment variable names of the form:
+
+PARAMETER=${<environment variable name>}
+
+   with the value of that environment variable. Thus, if <environment variable name> is CMD_HOSTNAME,
+then that variable is replaced by the name of the host.
+
+E.5.3 Restricting The Script To Nodes Or Node Categories
+As mentioned in section 2.1.3, node settings can be adjusted within a category. So the configuration
+changes to ifcfg-eth0 is best implemented per node by accessing and adjusting the finalize script
+per node if only a few nodes in the category are to be set up like this. If all the nodes in a category are to
+be set up like this, then the changes are best implemented in a finalize script accessed and adjusted at
+the category level. Accessing the scripts at the node and category levels is covered in section E.2.
+    People used to normal object inheritance behavior should be aware of the following when consider-
+ing category level and node level finalize scripts:
+    With objects, a node item value overrules a category level value. On the other hand, finalize scripts,
+while treated in an analogous way to objects, cannot always inherit properties from each other in the
+precise way that true objects can. Thus, it is possible that a finalize script run at the node level may not
+have anything to do with what is changed by running it at the category level. However, to allow it to
+resemble the inheritance behavior of object properties a bit, the node-level finalize script, if it exists, is
+always run after the category-level script. This gives it the ability to “overrule” the category level.
+                                                                                               F
+                    Workload Managers Quick
+                                  Reference
+F.1   Slurm
+Slurm is a GPL-licensed workload management system and developed largely at Lawrence Livermore
+National Laboratory. The name was originally an acronym for Simple Linux Utility for Resource Man-
+agement, but the acronym is deprecated because it no longer does justice to the advanced capabilities of
+Slurm.
+    The Slurm service and outputs are normally handled using the Base View or cmsh front end tools for
+CMDaemon (section 7.4).
+    From the command line, direct Slurm commands that may sometimes come in useful include the
+following:
+
+   • sacct: used to report job or job step accounting information about active or completed jobs.
+
+      Example
+
+      # sacct -j 43 -o jobid,AllocCPUs,NCPUS,NNodes,NTasks,ReqCPUs
+             JobID AllocCPUS       NCPUS NNodes     NTasks ReqCPUS
+      ------------ ---------- ---------- -------- -------- --------
+      43                    1          1        1                  1
+
+   • salloc: used to allocate resources for a job in real time. Typically this is used to allocate resources
+     and spawn a shell. The shell is then used to execute srun commands to launch parallel tasks.
+
+   • sattach used to attach standard input, output, and error plus signal capabilities to a currently
+     running job or job step. One can attach to and detach from jobs multiple times.
+
+   • sbatch: used to submit a job script for later execution. The script typically contains one or more
+     srun commands to launch parallel tasks.
+
+   • sbcast: used to transfer a file from local disk to local disk on the nodes allocated to a job. This can
+     be used to effectively use diskless compute nodes or provide improved performance relative to a
+     shared filesystem.
+
+   • scancel: used to cancel a pending or running job or job step. It can also be used to send an
+     arbitrary signal to all processes associated with a running job or job step.
+
+   • scontrol: the administrative tool used to view and/or modify Slurm state. Note that many scon-
+     trol commands can only be executed as user root.
+
+      Example
+952                                                                 Workload Managers Quick Reference
+
+      [fred@basecm11 ~]$ scontrol show nodes
+      NodeName=basecm11 Arch=x86_64 CoresPerSocket=1
+         CPUAlloc=0 CPUErr=0 CPUTot=1 CPULoad=0.05 Features=(null)
+      ...
+
+      If a node, for example node001, is stuck in a CG state (“completing”), and rebooting it is not feasible,
+      then the following may clear it in some cases:
+
+      Example
+
+      [fred@basecm11 ~]$ scontrol update nodename=node001 state=down reason=hung
+      [fred@basecm11 ~]$ scontrol update nodename=node001 state=resume
+
+  • sinfo: reports the state of partitions and nodes managed by Slurm. It has a wide variety of filter-
+    ing, sorting, and formatting options.
+
+      Example
+
+      basecm11:~ # sinfo -o "%9P %.5a %.10l %.6D %.6t %C %N"
+      PARTITION AVAIL TIMELIMIT NODES STATE CPUS(A/I/O/T) NODELIST
+      defq*        up infinite        1 alloc 1/0/0/1 basecm11
+
+  • smap: reports state information for jobs, partitions, and nodes managed by Slurm, but graphically
+    displays the information to reflect network topology.
+
+  • squeue: reports the state of jobs or job steps. It has a wide variety of filtering, sorting, and format-
+    ting options. By default, it reports the running jobs in priority order and then the pending jobs in
+    priority order.
+
+      Example
+
+      basecm11:~ # squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %C %R"
+      JOBID PARTITION NAME USER ST TIME NODES CPUS NODELIST(REASON)
+         43      defq bash fred R 16:22          1 1 basecm11
+      ...
+
+  • srun: used to submit a job for execution or initiate job steps in real time. srun has a wide variety of
+    options to specify resource requirements, including: minimum and maximum node count, proces-
+    sor count, specific nodes to use or not use, and specific node characteristics (so much memory, disk
+    space, certain required features, etc.). A job can contain multiple job steps executing sequentially
+    or in parallel on independent or shared nodes within the job’s node allocation.
+
+
+      Auto Scaler dynamic node issues with srun: A concern about srun (https://bugs.schedmd.
+      com/show_bug.cgi?id=1333) at the time of writing (January 2023) is the following: After an srun
+      job has been queued, and a new node is added, the slurm.conf file is not read again. This means
+      that the new node resource is not seen by jobs using srun. Thus, with srun jobs, nodes launched
+      dynamically by Auto Scaler remain unused, and can fail. Workarounds are to use salloc or
+      sbatch instead of srun.
+  • smap: reports state information for jobs, partitions, and nodes managed by Slurm, but graphically
+    displays the information to reflect network topology.
+
+  • strigger: used to set, get or view event triggers. Event triggers include things such as nodes
+    going down or jobs approaching their time limit.
+F.2 PBS Professional                                                                                  953
+
+   • sview: a graphical user interface to get and update state information for jobs, partitions, and nodes
+     managed by Slurm.
+
+   There are man pages for these commands. Full documentation on Slurm is available online at: http:
+//slurm.schedmd.com/documentation.html.
+
+F.2     PBS Professional
+The following commands can be used in PBS Professional to view queues, jobs, and server status:
+
+qstat                  query queue status
+qstat -a               show only queued or running jobs for a destination, or all states for a job ID
+qstat -r               show only running or suspended jobs for a destination, or all states for a job ID
+qstat -q               show queue status for destinations
+qstat -rn              only running or suspended jobs, with list of allocated nodes (exec_host string)
+qstat -i               information on queued, held, waiting jobs is given for specified destination. Inform-
+                       ation about the job is given if a job ID is specified, regardless of the job status
+qstat -B               display server status for the specified servers
+qstat -u <username>    show jobs for a user for the specified destination. Status
+                       information for the job is displayed for a specified job ID.
+
+   Other useful commands are:
+tracejob <job id>                  show what happened today to <job id>
+tracejob -n <number> <job id>      search last <number> days for <job id>
+
+qmgr               administrator interface to batch system ( man qmgr.8B for more details)
+
+qterm              terminates PBS server (but BCM starts pbs_server again)
+
+pbsnodes <node>    query status of compute node
+pbsnodes -a        query status of all compute nodes
+
+   The commands of PBS Professional are documented in the man pages, and also in the exten-
+sive documentation available via https://community.altair.com/community?id=altair_product_
+documentation.

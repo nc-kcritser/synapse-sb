@@ -1,0 +1,2066 @@
+
+                                                                                       D
+             Disk Partitioning And RAID
+                            Configuration
+Disk partitioning is initially configured on the head node and regular nodes during installation (section
+3.3.16 of the Installation Manual).
+    For the head node it cannot be changed from within BCM after implementation, and the head node
+is therefore not considered further in this section.
+    For regular nodes, partitioning can be changed after the initial configuration, by specifying a partic-
+ular set of values according to the XML partitioning schema described in section D.1.
+    For example, for regular nodes, changing the value set for the XML tag of:
+<xs:element name='filesystem'>
+
+decides which filesystem type out of ext2, ext3, ext4, xfs, and so on, is used. The changes are imple-
+mented during the node partitioning stage of the node-installer (section 5.4.6).
+   Diskless operation can also be implemented by using an appropriate XML file. This is introduced in
+section 3.13.1.
+   Software or hardware RAID configuration can also be set for the regular nodes. The layouts
+must be specified following the XML schema files stored on the head node in the directory /cm/
+node-installer/scripts/:
+
+   • Software RAID configuration is set in the global partitioning XML schema file disks.xsd (sec-
+     tion D.1).
+
+   • Hardware RAID configuration is set in the separate hardware RAID XML schema file raid.xsd
+     (section D.2).
+
+
+D.1    Structure Of Partitioning Definition—The Global Partitioning XML
+       Schema Definition File
+In BCM, regular node partitioning setups have their global structure specified using an XML schema def-
+inition file, which is installed on the head node in /cm/local/apps/cmd/etc/htdocs/xsd/disks.xsd.
+    The schema can also be viewed with:
+Example
+
+[root@basecm11 ]# cmsh -c "main xsdschema disks" | less
+
+   This schema does not include a hardware RAID definition. The hardware RAID schema is defined
+separately in the file raid.xsd (section D.2).
+   Examples of schemas in use, with and without hardware RAID, are given in sections D.3 and beyond.
+   An XML file can be validated against an XML schema definition file using the xmllint tool:
+904                                                     Disk Partitioning And RAID Configuration
+
+Example
+
+[root@basecm11 ]# cd /cm/local/apps/cmd/etc/htdocs/xsd
+[root@basecm11 xsd]# xmllint --noout --schema disks.xsd ../disk-setup/x86_64-slave-diskless.xml
+../disk-setup/x86_64-slave-diskless.xml validates
+[root@basecm11 xsd]#
+
+
+
+XML schema for partitioning
+
+<?xml version='1.0'?>
+
+<!--
+#
+# SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+
+This is the XML schema description of the partition layout XML file.
+It can be used by software to validate partitioning XML files.
+There are however a few things the schema does not check:
+- There should be exactly one root mountpoint (/), unless diskless.
+- There can only be one partition with a 'max' size on a particular device.
+- Something similar applies to logical volumes.
+- The 'auto' size can only be used for a swap partition.
+- Partitions of type 'linux swap' should not have a filesystem.
+- Partitions of type 'linux raid' should not have a filesystem.
+- Partitions of type 'linux lvm' should not have a filesystem.
+- Partitions of type 'unspecified' should not have a filesystem.
+- If a raid is a member of another raid then it can not have a filesystem.
+- Partitions, which are listed as raid members, should be of type 'linux raid'.
+- If diskless is not set, there should be at least one device.
+- The priority tag is only valid for partitions which have type set to
+  "linux swap".
+-->
+
+<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' elementFormDefault='qualified'>
+
+  <xs:element name='diskSetup'>
+
+      <xs:complexType>
+        <xs:sequence>
+          <xs:element name='diskless' type='diskless' minOccurs='0' maxOccurs='1'/>
+          <xs:element name='device' type='device' minOccurs='0' maxOccurs='unbounded'/>
+          <xs:element name='raid' type='raid' minOccurs='0' maxOccurs='unbounded'/>
+          <xs:element name='volumeGroup' type='volumeGroup' minOccurs='0' maxOccurs='unbounded'/>
+          <xs:element name='subVolumes' type='subVolumes' minOccurs='0' maxOccurs='unbounded'/>
+        </xs:sequence>
+      </xs:complexType>
+D.1 Structure Of Partitioning Definition—The Global Partitioning XML Schema Definition File 905
+
+
+
+   <xs:key name='partitionAndRaidIds'>
+     <xs:selector xpath='.//raid|.//partition'/>
+     <xs:field xpath='@id'/>
+   </xs:key>
+
+   <xs:keyref name='raidMemberIds' refer='partitionAndRaidIds'>
+     <xs:selector xpath='.//raid/member'/>
+     <xs:field xpath='.'/>
+   </xs:keyref>
+
+   <xs:keyref name='volumeGroupPhysicalVolumes' refer='partitionAndRaidIds'>
+     <xs:selector xpath='.//volumeGroup/physicalVolumes/member'/>
+     <xs:field xpath='.'/>
+   </xs:keyref>
+
+   <xs:keyref name='subVolumeIds' refer='partitionAndRaidIds'>
+     <xs:selector xpath='.//subVolumes'/>
+     <xs:field xpath='@parent'/>
+   </xs:keyref>
+
+   <xs:unique name='raidAndVolumeMembersUnique'>
+     <xs:selector xpath='.//member'/>
+     <xs:field xpath='.'/>
+   </xs:unique>
+
+   <xs:unique name='deviceNodesUnique'>
+     <xs:selector xpath='.//device/blockdev'/>
+     <xs:field xpath='.'/>
+     <xs:field xpath='@mode'/>
+   </xs:unique>
+
+   <xs:unique name='mountPointsUnique'>
+     <xs:selector xpath='.//mountPoint'/>
+     <xs:field xpath='.'/>
+   </xs:unique>
+
+   <xs:unique name='assertNamesUnique'>
+     <xs:selector xpath='.//assert'/>
+     <xs:field xpath='@name'/>
+   </xs:unique>
+
+ </xs:element>
+
+ <xs:complexType name='diskless'>
+   <xs:attribute name='maxMemSize' type='memSize' use='required'/>
+   <xs:attribute name='mountOptions' type='xs:string'/>
+ </xs:complexType>
+
+ <xs:simpleType name='memSize'>
+   <xs:restriction base='xs:string'>
+     <xs:pattern value='([0-9]+[MG])|100%|[0-9][0-9]%|[0-9]%|0'/>
+   </xs:restriction>
+ </xs:simpleType>
+906                                                    Disk Partitioning And RAID Configuration
+
+ <xs:simpleType name='stripeSize'>
+   <xs:restriction base='xs:string'>
+     <xs:pattern value='4|8|16|32|64|128|256|512|1024|1K|2048|2K|4096|4K'/>
+     <xs:pattern value='8192|8K|16384|16K|32768|32K|65536|64K|131072|128K'/>
+     <xs:pattern value='262144|256K|524288|512K|1048576|1024K|1M'/>
+     <xs:pattern value='2097152|2048K|2M|4194304|4096K|4M'/>
+   </xs:restriction>
+ </xs:simpleType>
+
+ <xs:simpleType name='size'>
+   <xs:restriction base='xs:string'>
+     <xs:pattern value='max|auto|[0-9]+[MGT]'/>
+   </xs:restriction>
+ </xs:simpleType>
+
+ <xs:simpleType name='relativeOrAbsoluteSize'>
+   <xs:restriction base='xs:string'>
+     <xs:pattern value='max|auto|[0-9]+[MGT]|[0-9]+([.][0-9]+)?%|[0-9]+/[0-9]+'/>
+   </xs:restriction>
+ </xs:simpleType>
+
+ <xs:simpleType name='extentSize'>
+   <xs:restriction base='xs:string'>
+     <xs:pattern value='([0-9])+M'/>
+   </xs:restriction>
+ </xs:simpleType>
+
+ <xs:simpleType name='blockdevName'>
+   <xs:restriction base='xs:string'>
+     <xs:pattern value='/dev/.+'/>
+   </xs:restriction>
+ </xs:simpleType>
+
+ <xs:complexType name='blockdev'>
+   <xs:simpleContent>
+     <xs:extension base="blockdevName">
+       <xs:attribute name="mode" default='normal'>
+         <xs:simpleType>
+           <xs:restriction base="xs:string">
+             <xs:pattern value="normal|cloud|both"/>
+           </xs:restriction>
+         </xs:simpleType>
+       </xs:attribute>
+     </xs:extension>
+   </xs:simpleContent>
+ </xs:complexType>
+
+ <xs:complexType name='device'>
+   <xs:sequence>
+     <xs:element name='blockdev' type='blockdev' minOccurs='1' maxOccurs='unbounded'/>
+     <xs:element name='vendor' type='xs:string' minOccurs='0' maxOccurs='1'/>
+     <xs:element name='requiredSize' type='size' minOccurs='0' maxOccurs='1'/>
+     <xs:element name='assert' minOccurs='0' maxOccurs='unbounded'>
+       <xs:complexType>
+         <xs:simpleContent>
+D.1 Structure Of Partitioning Definition—The Global Partitioning XML Schema Definition File 907
+
+           <xs:extension base='xs:string'>
+             <xs:attribute name='name' use='required'>
+               <xs:simpleType>
+                 <xs:restriction base='xs:string'>
+                   <xs:pattern value='[a-zA-Z0-9-_]+'/>
+                 </xs:restriction>
+               </xs:simpleType>
+             </xs:attribute>
+             <xs:attribute name='args' type='xs:string'/>
+           </xs:extension>
+         </xs:simpleContent>
+       </xs:complexType>
+     </xs:element>
+     <xs:element name='alignMiB' type='xs:boolean' minOccurs='0' maxOccurs='1'/>
+     <xs:element name="partitionTable" minOccurs='0' maxOccurs='1'>
+       <xs:simpleType>
+         <xs:restriction base="xs:string">
+           <xs:pattern value="gpt|msdos"/>
+         </xs:restriction>
+       </xs:simpleType>
+     </xs:element>
+     <xs:element name='partition' type='partition' minOccurs='1' maxOccurs='unbounded'/>
+   </xs:sequence>
+   <xs:attribute name='origin' type='xs:string'/>
+ </xs:complexType>
+
+ <xs:complexType name='partition'>
+   <xs:sequence>
+     <xs:element name='size' type='relativeOrAbsoluteSize'/>
+     <xs:element name='type'>
+       <xs:simpleType>
+         <xs:restriction base='xs:string'>
+           <xs:enumeration value='linux'/>
+           <xs:enumeration value='linux swap'/>
+           <xs:enumeration value='linux raid'/>
+           <xs:enumeration value='linux lvm'/>
+           <xs:enumeration value='unspecified'/>
+         </xs:restriction>
+       </xs:simpleType>
+     </xs:element>
+     <xs:element name='encryption' type='encryption' minOccurs='0' maxOccurs='1'/>
+     <xs:group ref='filesystem' minOccurs='0' maxOccurs='1'/>
+     <xs:element name='priority' minOccurs='0' maxOccurs='1'>
+       <xs:simpleType>
+         <xs:restriction base="xs:integer">
+           <xs:minInclusive value="0"/>
+           <xs:maxInclusive value="32767"/>
+         </xs:restriction>
+       </xs:simpleType>
+     </xs:element>
+   </xs:sequence>
+   <xs:attribute name='id' type='xs:string' use='required'/>
+   <xs:attribute name='partitiontype' type='xs:string'/>
+ </xs:complexType>
+908                                                  Disk Partitioning And RAID Configuration
+
+ <xs:complexType name='encryption' mixed="true">
+   <xs:sequence>
+     <xs:element name='type' minOccurs='0' maxOccurs='1'>
+       <xs:simpleType>
+         <xs:restriction base='xs:string'>
+           <xs:enumeration value='luks2'/>
+           <xs:enumeration value='luks1'/>
+           <!-- rest of this enum is intentionally left blank -->
+         </xs:restriction>
+       </xs:simpleType>
+     </xs:element>
+     <xs:element name='cipher' minOccurs='0' maxOccurs='1' type='xs:string'/>
+     <xs:element name='hash' minOccurs='0' maxOccurs='1' type='xs:string'/>
+     <xs:element name='keySize' minOccurs='0' maxOccurs='1' type='xs:integer'/>
+     <xs:element name='name' minOccurs='0' maxOccurs='1' type='xs:string'/>
+     <xs:element name='allowDiscards' minOccurs='0' maxOccurs='1' type='xs:boolean' default='true'/>
+     <xs:element name='custom' minOccurs='0' maxOccurs='1' type='xs:string'/>
+   </xs:sequence>
+ </xs:complexType>
+
+ <xs:group name='filesystem'>
+   <xs:sequence>
+     <xs:element name='filesystem'>
+       <xs:simpleType>
+         <xs:restriction base='xs:string'>
+           <xs:enumeration value='ext2'/>
+           <xs:enumeration value='ext3'/>
+           <xs:enumeration value='ext4'/>
+           <xs:enumeration value='xfs'/>
+           <xs:enumeration value='btrfs'/>
+           <xs:enumeration value='zfs'/>
+           <xs:enumeration value='fat32'/>
+           <xs:enumeration value='fat'/>
+         </xs:restriction>
+       </xs:simpleType>
+     </xs:element>
+     <xs:element name='mkfsFlags' type='xs:string' minOccurs='0' maxOccurs='1'/>
+     <xs:element name='mountPoint' type='xs:string' minOccurs='0' maxOccurs='1'/>
+     <xs:element name='mountOptions' type='xs:string' default='defaults' minOccurs='0'/>
+   </xs:sequence>
+ </xs:group>
+
+ <xs:complexType name='raid'>
+   <xs:sequence>
+     <xs:element name='member' type='xs:string' minOccurs='2' maxOccurs='unbounded'/>
+     <xs:element name='level' type='xs:int'/>
+     <xs:element name='metaData' minOccurs='0' maxOccurs='1'>
+       <xs:simpleType>
+         <xs:restriction base='xs:string'>
+           <xs:enumeration value='0'/>
+           <xs:enumeration value='0.9'/>
+           <xs:enumeration value='0.90'/>
+           <xs:enumeration value='1'/>
+           <xs:enumeration value='1.0'/>
+           <xs:enumeration value='1.1'/>
+D.1 Structure Of Partitioning Definition—The Global Partitioning XML Schema Definition File 909
+
+           <xs:enumeration value='1.2'/>
+           <xs:enumeration value='default'/>
+         </xs:restriction>
+       </xs:simpleType>
+     </xs:element>
+     <xs:element name='encryption' type='encryption' minOccurs='0' maxOccurs='1'/>
+     <xs:choice minOccurs='0' maxOccurs='1'>
+       <xs:group ref='filesystem'/>
+       <xs:sequence>
+         <xs:element name='swap'><xs:complexType /></xs:element>
+         <xs:element name='priority' minOccurs='0' maxOccurs='1'>
+           <xs:simpleType>
+             <xs:restriction base="xs:integer">
+               <xs:minInclusive value="0"/>
+               <xs:maxInclusive value="32767"/>
+             </xs:restriction>
+           </xs:simpleType>
+         </xs:element>
+       </xs:sequence>
+     </xs:choice>
+   </xs:sequence>
+   <xs:attribute name='id' type='xs:string' use='required'/>
+ </xs:complexType>
+
+ <xs:complexType name='volumeGroup'>
+   <xs:sequence>
+     <xs:element name='name' type='xs:string'/>
+     <xs:element name='extentSize' type='extentSize'/>
+     <xs:element name='physicalVolumes'>
+       <xs:complexType>
+         <xs:sequence>
+           <xs:element name='member' type='xs:string' minOccurs='1' maxOccurs='unbounded'/>
+         </xs:sequence>
+       </xs:complexType>
+     </xs:element>
+     <xs:element name='logicalVolumes'>
+       <xs:complexType>
+         <xs:sequence>
+           <xs:element name='volume' type='logicalVolume' minOccurs='1' maxOccurs='unbounded'/>
+         </xs:sequence>
+       </xs:complexType>
+     </xs:element>
+   </xs:sequence>
+ </xs:complexType>
+
+ <xs:complexType name='logicalVolume'>
+   <xs:sequence>
+     <xs:element name='name' type='xs:string'/>
+     <xs:element name='size' type='size'/>
+     <xs:element name='pool' type='xs:string' minOccurs='0' maxOccurs='1'/>
+     <xs:element name='stripes' minOccurs='0' maxOccurs='1'>
+       <xs:simpleType>
+         <xs:restriction base="xs:integer">
+           <xs:minInclusive value="1"/>
+           <xs:maxInclusive value="32768"/>
+910                                                   Disk Partitioning And RAID Configuration
+
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name='stripeSize' type='stripeSize' minOccurs='0' maxOccurs='1'/>
+      <xs:element name='encryption' type='encryption' minOccurs='0' maxOccurs='1'/>
+      <xs:element name='swap' minOccurs='0' maxOccurs='1'/>
+      <xs:element name='priority' minOccurs='0' maxOccurs='1'>
+        <xs:simpleType>
+          <xs:restriction base="xs:integer">
+            <xs:minInclusive value="0"/>
+            <xs:maxInclusive value="32767"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:group ref='filesystem' minOccurs='0' maxOccurs='1'/>
+    </xs:sequence>
+    <xs:attribute name="thinpool">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:pattern value="1"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="metadatasize">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:pattern value="([1-9][MGT])|([1-9][0-9]+[MGT])"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+
+  <xs:complexType name='subVolumes'>
+    <xs:sequence>
+      <xs:element name='subVolume' type='subVolume' minOccurs='1' maxOccurs='unbounded'/>
+    </xs:sequence>
+    <xs:attribute name='parent' type='xs:string' use='required'/>
+  </xs:complexType>
+
+  <xs:complexType name='subVolume'>
+    <xs:sequence>
+      <xs:element name='mountPoint' type='xs:string'/>
+      <xs:element name='mountOptions' type='xs:string'/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>
+
+
+
+      Examples Of Element Types In XML Schema
+D.2 Structure Of Hardware RAID Definition—The Hardware RAID XML Schema Definition File911
+
+      Name Of Type    Example Values
+      size            10G, 128M, 1T, 2.5T, 1/3, 33.333%, auto, max
+      device          /dev/sda, /dev/hda, /dev/cciss/c0d0
+      partition       linux, linux raid, linux swap, unspecified
+      filesystem      ext2, ext3, ext4, xfs
+
+
+
+D.2    Structure Of Hardware RAID Definition—The Hardware RAID XML
+       Schema Definition File
+If a hardware RAID has already been created outside of BCM, then no XML definition is needed. This
+assumes that required kernel modules for the device load, so that the operating system ends up treating
+the RAID as a standard block device, which can therefore have its layout configured as described in
+section 3.13.
+    If, instead, hardware RAID is to be created and managed by BCM, then it can be specified using an
+XML schema definition file, stored on the head node in /cm/local/apps/cmd/etc/htdocs/xsd/raid.
+xsd.
+    The schema can also be viewed with cmsh:
+
+Example
+
+[root@basecm11 ]# cmsh -c "main xsdschema raid" | less
+
+   The full schema definition is listed next, while schema examples are listed in section D.4.1.
+   Configuration using BCM is currently limited to MegaRAID hardware. It may not work for newer
+controllers that do not support MegaCLI, or its successor StorCLI. It may also not work for controllers
+by vendors that do not use MegaCLI or StorCLI.
+
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+
+<!--
+#
+# SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+#
+
+This is the XML schema description of the hardware RAID layout XML file.
+It can be used by software to validate partitioning XML files.
+There are however a few things the schema does not check:
+- All of the spans (drive groups) in an raidArray must have the same number of drives.
+- There can only be one volume with a 'max' size on a particular array, and this
+must be the last volume in the array.
+- If there is only one enclosure defined for a particular RAID controller the actual
+enclosureID can be omitted, by using "auto" instead. Otherwise, the actual enclosureID
+must be specified.
+-->
+912                                                   Disk Partitioning And RAID Configuration
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+<xs:simpleType name="raidLevel">
+  <xs:restriction base="xs:nonNegativeInteger">
+    <xs:pattern value="0|1|5|10|50"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="volumeSize">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="[0-9]{1,5}[MGT]|max"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="stripeSize">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="8K|16K|32K|64K|128K|256K|512K|1024K"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="cachePolicy">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="Cached|Direct"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!--
+  NORA : No Read Ahead
+  RA    : Read Ahead
+  ADRA : Adaptive Read
+-->
+<xs:simpleType name="readPolicy">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="NORA|RA|ADRA"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<!--
+  WT : Write Through
+  WB : Write Back
+-->
+<xs:simpleType name="writePolicy">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="WT|WB"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="enclosureID">
+  <xs:restriction base="xs:string">
+    <xs:pattern value="auto|[0-9]{1,4}"/>
+  </xs:restriction>
+</xs:simpleType>
+
+<xs:simpleType name="slotNumber">
+  <xs:restriction base="xs:nonNegativeInteger">
+D.2 Structure Of Hardware RAID Definition—The Hardware RAID XML Schema Definition File913
+
+    <xs:pattern value="[0-9]{1,2}"/>
+  </xs:restriction>
+</xs:simpleType>
+
+
+<xs:element name="raidSetup">
+  <xs:complexType>
+    <xs:sequence>
+
+      <xs:element name="raidArray" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+
+            <xs:element name="level" type="raidLevel"/>
+
+            <xs:element name="raidVolume" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:sequence>
+
+                  <xs:element name="stripeSize" type="stripeSize"/>
+
+                  <xs:element name="cachePolicy" type="cachePolicy"/>
+
+                  <xs:element name="readPolicy" type="readPolicy"/>
+
+                  <xs:element name="writePolicy" type="writePolicy"/>
+
+                  <xs:element name="size" type="volumeSize"/>
+
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+
+            <xs:choice>
+
+              <xs:element name="device" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+
+                    <xs:element name="enclosureID" type="enclosureID"/>
+
+                    <xs:element name="slotNumber" type="slotNumber"/>
+
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+
+              <xs:element name="span" minOccurs="2" maxOccurs="8">
+                <xs:complexType>
+                  <xs:sequence>
+
+                    <xs:element name="device" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:sequence>
+914                                                      Disk Partitioning And RAID Configuration
+
+                             <xs:element name="enclosureID" type="enclosureID"/>
+
+                             <xs:element name="slotNumber" type="slotNumber"/>
+
+                          </xs:sequence>
+                        </xs:complexType>
+                      </xs:element>
+
+                   </xs:sequence>
+                 </xs:complexType>
+               </xs:element>
+
+             </xs:choice>
+
+           </xs:sequence>
+         </xs:complexType>
+       </xs:element>
+
+    </xs:sequence>
+  </xs:complexType>
+</xs:element>
+
+</xs:schema>
+
+
+D.3     Example: Default Node Partitioning
+The following example follows the schema definition of section D.1, and shows the default layout used
+for regular nodes:
+
+Example
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <blockdev>/dev/hda</blockdev>
+    <blockdev>/dev/vda</blockdev>
+    <blockdev>/dev/xvda</blockdev>
+    <blockdev>/dev/cciss/c0d0</blockdev>
+    <blockdev>/dev/nvme0n1</blockdev>
+    <blockdev mode="cloud">/dev/sdb</blockdev>
+    <blockdev mode="cloud">/dev/hdb</blockdev>
+    <blockdev mode="cloud">/dev/vdb</blockdev>
+    <blockdev mode="cloud">/dev/xvdb</blockdev>
+    <!-- the following for paravirtual rhel6: -->
+    <blockdev mode="cloud">/dev/xvdf</blockdev>
+    <!-- the following for nvme volumes -->
+    <blockdev mode="cloud">/dev/nvme1n1</blockdev>
+
+      <partition id="a0" partitiontype="esp">
+        <size>100M</size>
+        <type>linux</type>
+        <filesystem>fat</filesystem>
+        <mountPoint>/boot/efi</mountPoint>
+        <mountOptions>defaults,noatime,nodiratime</mountOptions>
+D.3 Example: Default Node Partitioning                                                                 915
+
+    </partition>
+
+    <partition id="a1">
+      <size>20G</size>
+      <type>linux</type>
+      <filesystem>xfs</filesystem>
+      <mountPoint>/</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+
+    <partition id="a2">
+      <size>6G</size>
+      <type>linux</type>
+      <filesystem>xfs</filesystem>
+      <mountPoint>/var</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+
+    <partition id="a3">
+      <size>2G</size>
+      <type>linux</type>
+      <filesystem>xfs</filesystem>
+      <mountPoint>/tmp</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime,nosuid,nodev</mountOptions>
+    </partition>
+
+    <partition id="a4">
+      <size>12G</size>
+      <type>linux swap</type>
+    </partition>
+
+    <partition id="a5">
+      <size>max</size>
+      <type>linux</type>
+      <filesystem>xfs</filesystem>
+      <mountPoint>/local</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+
+  </device>
+</diskSetup>
+
+    The example assumes a single disk. Another disk can be added by adding another pair of
+<device><device> tags and filling in the partitioning specifications for the next disk. Because multi-
+ple blockdev tags are used, the node-installer first tries to use /dev/sda, then /dev/hda, then /dev/vda
+(virtio disks), then /dev/xvda (xen disks), and so on. Cloud devices can also be accessed using the
+mode="cloud" option. Removing block devices from the layout if they are not going to be used does no
+harm.
+    For each partition, a size tag is specified. Sizes can be specified using megabytes (e.g. 500M),
+gigabytes (e.g. 50G) or terabytes (e.g. 2T or 4.5T). Relative sizes, without units, can be used in the form
+of fractions (e.g. 2/3) or percentages (e.g. 70%), which can be useful for disk sizes that are not known in
+advance.
+    Small differences in size do not trigger a full install for existing relative partitions.
+    For swap partitions, a size of auto sets a swap partition to twice the node memory size. If there is
+more than one swap partition, then the priority tag can be set so that the partition with the higher
+916                                                           Disk Partitioning And RAID Configuration
+
+priority is used first.
+   For a device, the attribute max for a size tag forces the last device in the partition to use all remaining
+space, and if needed, adjusts the implementation of the sequence of size tags in the remaining partitions
+accordingly. The use of max for a partition is convenient.
+   In the example, all non-boot filesystems are specified as xfs. One of the valid alternatives is ext4.
+   The mount man page has more details on mount options. If the mountOptions tag is left empty, its
+value defaults to defaults.
+
+
+D.4     Example: Hardware RAID Configuration
+A prerequisite with hardware RAID is that it must be enabled and configured properly in the BIOS.
+   If it is enabled and configured correctly, then the hardware RAID configuration can be defined or
+modified by setting the hardwareraidconfiguration parameter in device or category mode:
+
+Example
+
+[root@basecm11 ~]# cmsh
+[basecm11]% category use default
+[basecm11->category[default]]% set hardwareraidconfiguration
+
+  This opens up an editor in which the XML file can be specified according to the schema in section D.2.
+XML validation is carried out.
+
+D.4.1 RAID level 0 And RAID 10 Example
+In the following configuration the node has two RAID arrays, one in a RAID 0 and the other in a RAID
+10 configuration:
+
+   • The RAID 0 array contains three volumes and is made up of two hard disks, placed in slots 0 and
+     1. The volumes have different values for the options and policies.
+
+   • The RAID 10 array consists of just one volume and has two spans, in slots 2 and 3. Each span has
+     two hard disks.
+
+Example
+
+<raidSetup>
+  <raidArray>
+    <level>0</level>
+
+      <raidVolume>
+        <stripeSize>64K</stripeSize>
+        <cachePolicy>Direct</cachePolicy>
+        <readPolicy>NORA</readPolicy>
+        <writePolicy>WT</writePolicy>
+        <size>40G</size>
+      </raidVolume>
+
+      <raidVolume>
+        <stripeSize>128K</stripeSize>
+        <cachePolicy>Direct</cachePolicy>
+        <readPolicy>RA</readPolicy>
+        <writePolicy>WB</writePolicy>
+        <size>80G</size>
+      </raidVolume>
+
+      <raidVolume>
+D.4 Example: Hardware RAID Configuration   917
+
+      <stripeSize>256K</stripeSize>
+      <cachePolicy>Cached</cachePolicy>
+      <readPolicy>ADRA</readPolicy>
+      <writePolicy>WT</writePolicy>
+      <size>100G</size>
+    </raidVolume>
+
+    <device>
+      <enclosureID>auto</enclosureID>
+      <slotNumber>0</slotNumber>
+    </device>
+
+    <device>
+      <enclosureID>32</enclosureID>
+      <slotNumber>1</slotNumber>
+    </device>
+  </raidArray>
+
+  <raidArray>
+    <level>10</level>
+
+    <raidVolume>
+      <stripeSize>64K</stripeSize>
+      <cachePolicy>Direct</cachePolicy>
+      <readPolicy>NORA</readPolicy>
+      <writePolicy>WT</writePolicy>
+      <size>40G</size>
+    </raidVolume>
+
+    <span>
+      <device>
+        <enclosureID>auto</enclosureID>
+        <slotNumber>2</slotNumber>
+      </device>
+
+      <device>
+        <enclosureID>auto</enclosureID>
+        <slotNumber>3</slotNumber>
+      </device>
+    </span>
+
+    <span>
+      <device>
+        <enclosureID>auto</enclosureID>
+        <slotNumber>4</slotNumber>
+      </device>
+
+      <device>
+        <enclosureID>auto</enclosureID>
+        <slotNumber>5</slotNumber>
+      </device>
+    </span>
+  </raidArray>
+</raidSetup>
+918                                                        Disk Partitioning And RAID Configuration
+
+D.5    Example: Software RAID
+The following example shows a simple software RAID setup:
+Example
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:noNamespaceSchemaLocation="schema.xsd">
+
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <partition id="a1">
+      <size>25G</size>
+      <type>linux raid</type>
+    </partition>
+  </device>
+
+  <device>
+    <blockdev>/dev/sdb</blockdev>
+    <partition id="b1">
+      <size>25G</size>
+      <type>linux raid</type>
+    </partition>
+  </device>
+
+  <raid id="r1">
+    <member>a1</member>
+    <member>b1</member>
+    <level>1</level>
+    <filesystem>ext3</filesystem>
+    <mountPoint>/</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+
+</diskSetup>
+
+The level tag specifies the RAID level used. The following are supported:
+   • 0 (striping without parity)
+   • 1 (mirroring)
+   • 4 (striping with dedicated parity drive)
+   • 5 (striping with distributed parity)
+   • 6 (striping with distributed double parity)
+   • 10 (mirroring and striping)
+    The member tags must refer to an id attribute of a partition tag, or an id attribute of a another raid
+tag. The latter can be used to create, for example, a nested RAID 10 (1+0) configuration, instead of a
+complex RAID 10 configuration as specified by a <level>10</level> entry. A good explanation of the
+difference between complex and nested RAID 10 can be found at https://documentation.suse.com/
+sles/15-SP5/html/SLES-all/cha-raid10.html#sec-raid10-complex.
+    The administrator must ensure that the correct RAID kernel module is loaded (section 5.3.2). Includ-
+ing the appropriate module from the following is usually sufficient: raid0, raid1, raid4, raid5, raid6,
+raid10.
+D.6 Example: Software RAID With Swap                                                        919
+
+D.6   Example: Software RAID With Swap
+The <swap></swap> tag is used to indicate a swap partition in a RAID device specified in the XML
+schema of section D.1. For example, the following marks a 1GB RAID 1 partition as being used for
+swap, and the second partition for an ext3 filesystem:
+
+<?xml version="1.0" encoding="UTF-8"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <partition id="a1">
+      <size>1G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="a2">
+      <size>max</size>
+      <type>linux raid</type>
+    </partition>
+  </device>
+  <device>
+    <blockdev>/dev/sdb</blockdev>
+    <partition id="b1">
+      <size>1G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="b2">
+      <size>max</size>
+      <type>linux raid</type>
+    </partition>
+  </device>
+  <raid id="r1">
+    <member>a1</member>
+    <member>b1</member>
+    <level>1</level>
+    <swap></swap>
+  </raid>
+  <raid id="r2">
+    <member>a2</member>
+    <member>b2</member>
+    <level>1</level>
+    <filesystem>ext3</filesystem>
+    <mountPoint>/</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+</diskSetup>
+
+   As in section D.5, the appropriate RAID modules must be loaded beforehand.
+
+D.7   Example: Logical Volume Manager
+This example shows a simple LVM setup:
+
+Example
+
+<?xml version="1.0" encoding="UTF-8"?>
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+920                                                        Disk Partitioning And RAID Configuration
+
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <blockdev>/dev/hda</blockdev>
+    <blockdev>/dev/vda</blockdev>
+    <blockdev>/dev/xvda</blockdev>
+    <blockdev>/dev/cciss/c0d0</blockdev>
+    <blockdev mode="cloud">/dev/sdb</blockdev>
+    <blockdev mode="cloud">/dev/hdb</blockdev>
+    <blockdev mode="cloud">/dev/vdb</blockdev>
+    <blockdev mode="cloud">/dev/xvdb</blockdev>
+    <blockdev mode="cloud">/dev/xvdf</blockdev>
+    <partition id="a1">
+      <size>1G</size>
+      <type>linux</type>
+      <filesystem>ext2</filesystem>
+      <mountPoint>/boot</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+    <partition id="a2">
+      <size>16G</size>
+      <type>linux swap</type>
+    </partition>
+    <partition id="a3">
+      <size>max</size>
+      <type>linux lvm</type>
+    </partition>
+  </device>
+  <volumeGroup>
+    <name>vg01</name>
+    <extentSize>8M</extentSize>
+    <physicalVolumes>
+      <member>a3</member>
+    </physicalVolumes>
+    <logicalVolumes>
+      <volume>
+        <name>lv00</name>
+        <size>max</size>
+        <filesystem>ext3</filesystem>
+        <mountPoint>/</mountPoint>
+        <mountOptions>defaults,noatime,nodiratime</mountOptions>
+      </volume>
+      <volume>
+        <name>lv01</name>
+        <size>8G</size>
+        <filesystem>ext3</filesystem>
+        <mountPoint>/tmp</mountPoint>
+        <mountOptions>defaults,noatime,nodiratime</mountOptions>
+      </volume>
+    </logicalVolumes>
+  </volumeGroup>
+</diskSetup>
+
+The member tags must refer to an id attribute of a partition tag, or an id attribute of a raid tag.
+   The administrator must ensure that the dm-mod kernel module is loaded when LVM is used.
+D.8 Example: Logical Volume Manager With RAID 1                                       921
+
+D.8   Example: Logical Volume Manager With RAID 1
+This example shows an LVM setup, but with the LVM partitions mirrored using RAID 1:
+
+Example
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:no\
+NamespaceSchemaLocation="schema.xsd">
+
+<device>
+  <blockdev>/dev/sda</blockdev>
+    <partition id="a1">
+      <size>1G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="a2">
+      <size>max</size>
+      <type>linux raid</type>
+    </partition>
+</device>
+
+<device>
+  <blockdev>/dev/sdb</blockdev>
+    <partition id="b1">
+      <size>1G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="b2">
+      <size>max</size>
+      <type>linux raid</type>
+    </partition>
+</device>
+
+<raid id="r1">
+  <member>a1</member>
+  <member>b1</member>
+  <level>1</level>
+  <filesystem>ext3</filesystem>
+  <mountPoint>/boot</mountPoint>
+  <mountOptions>defaults,noatime,nodiratime</mountOptions>
+</raid>
+
+<raid id="r2">
+  <member>a2</member>
+  <member>b2</member>
+  <level>1</level>
+</raid>
+
+<volumeGroup>
+  <name>vg01</name>
+  <extentSize>8M</extentSize>
+  <physicalVolumes>
+    <member>r2</member>
+  </physicalVolumes>
+
+  <logicalVolumes>
+922                                                      Disk Partitioning And RAID Configuration
+
+    <volume>
+      <name>lv00</name>
+      <size>50G</size>
+      <filesystem>ext3</filesystem>
+      <mountPoint>/</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </volume>
+    <volume>
+      <name>lv01</name>
+      <size>25G</size>
+      <filesystem>ext3</filesystem>
+      <mountPoint>/tmp</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </volume>
+    <volume>
+      <name>lv02</name>
+      <size>25G</size>
+      <filesystem>ext3</filesystem>
+      <mountPoint>/var</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </volume>
+  </logicalVolumes>
+</volumeGroup>
+
+</diskSetup>
+
+
+D.9    Example: Diskless
+This example shows a node configured for diskless operation:
+
+Example
+
+<?xml version="1.0" encoding="UTF-8"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <diskless maxMemSize="90%"></diskless>
+</diskSetup>
+
+An example of the implementation of a diskless configuration is given in section 3.13.3.
+   In diskless mode the software image is transferred by the node-installer to a RAM-based filesystem
+on the node called tmpfs.
+   The obvious advantage of running from RAM is the elimination of the physical disk, cutting power
+consumption and reducing the chance of hardware failure. On the other hand, some of the RAM on the
+node is then no longer available for user applications.
+
+Special considerations with diskless mode:
+
+   • Recommended minimum RAM size: The available RAM per node should be sufficient to run the
+     OS and the required tasks. At least 4GB is recommended for diskless nodes.
+
+   • The tmpfs size limit: The maximum amount of RAM that can be used for a filesystem is set with
+     the maxMemSize attribute. A value of 100% allows all of the RAM to be used. The default value is
+     90%. A value of 0, without the % sign, removes all restrictions.
+      A limit does not however necessarily prevent the node from crashing, as some processes might
+      not deal properly with a situation when there is no more space left on the filesystem.
+D.10 Example: Semi-diskless                                                                            923
+
+   • Persistence issues: While running as a diskless node, the node is unable to retain any non-shared
+     data each time it reboots. For example the files in /var/log/*, which are normally preserved by
+     the exclude list settings for disked nodes, are lost from RAM during diskless mode reboots. The
+     installmode NOSYNC setting cannot be used with diskless nodes during a node reboot.
+
+   • Leftover disk issues: Administrators in charge of sensitive environments should be aware that
+     the disk of a node that is now running in diskless mode still contains files from the last time the
+     disk was used, unless the files are explicitly wiped.
+
+   • Reducing the software image size in tmpfs on a diskless node: To make more RAM available for
+     tasks, the software image size held in RAM can be reduced:
+
+        – by removing unnecessary software from the image.
+        – by mounting parts of the filesystem in the image over NFS during normal use. This is espe-
+          cially worthwhile for less frequently accessed parts of the image (section 3.14.3).
+
+
+D.10    Example: Semi-diskless
+Diskless operation (section D.9) can also be mixed with certain parts of the filesystem on the local physi-
+cal disk. This frees up RAM which the node can then put to other use. In this example all data in /local
+is on the physical disk, the rest in RAM.
+
+Example
+
+<?xml version="1.0" encoding="UTF-8"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:noNamespaceSchemaLocation="schema.xsd">
+  <diskless maxMemSize="0"></diskless>
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <partition id="a1">
+      <size>max</size>
+      <type>linux</type>
+      <filesystem>ext3</filesystem>
+      <mountPoint>/local</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+  </device>
+</diskSetup>
+
+    When nodes operate in semi-diskless mode the node-installer always uses excludelistfullinstall
+(section 5.4.7) when synchronizing the software image to memory and disk.
+    An alternative to using a local disk for freeing up RAM is to use NFS storage, as is described in
+section 3.14.3.
+
+
+D.11    Example: Preventing Accidental Data Loss
+Optional tags, vendor and requiredSize, can be used to prevent accidentally repartitioning the wrong
+drive. Such a tag use is shown in the following example.
+
+Example
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+924                                                        Disk Partitioning And RAID Configuration
+
+           xsi:noNamespaceSchemaLocation="schema.xsd">
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <vendor>Hitachi</vendor>
+    <requiredSize>200G</requiredSize>
+
+      <partition id="a1">
+        <size>max</size>
+        <type>linux</type>
+        <filesystem>ext3</filesystem>
+        <mountPoint>/</mountPoint>
+        <mountOptions>defaults,noatime,nodiratime</mountOptions>
+      </partition>
+
+  </device>
+  <device>
+    <blockdev>/dev/sdb</blockdev>
+    <vendor>BigRaid</vendor>
+    <requiredSize>2T</requiredSize>
+
+      <partition id="b1">
+        <size>max</size>
+        <type>linux</type>
+        <filesystem>ext3</filesystem>
+        <mountPoint>/data</mountPoint>
+        <mountOptions>defaults,noatime,nodiratime</mountOptions>
+      </partition>
+
+  </device>
+</diskSetup>
+
+    If a vendor or a requiredSize element is specified, it is treated as an assertion which is checked
+by the node-installer. The node-installer reads the drive vendor string from /sys/block/<drive
+name>/device/vendor. For the assertion to succeed, the ratio of actual disk size to the value specified
+by requiredSize, should be at least 0.85:1, and at most 1:0.85.
+    That is: to be able to get past the requiredSize assertion, the actual drive size as seen from fdisk
+-l should be 85% to about 118% of the asserted size.
+    If any assertion fails, no partitioning changes will be made to any of the specified devices.
+    For assertions with drives that are similar or identical in size, and are from the same vendor, the
+requiredSize and vendor elements are not enough to differentiate between the drives. In such cases,
+custom assertions (section D.12) can be set for particular drives.
+    Specifying device assertions is recommended for nodes that contain important data because it pro-
+tects against a situation where a drive is assigned to an incorrect block device. This can happen, for
+example, when the first drive, for example /dev/sda, in a multi-drive system is not detected (e.g. due to
+a hardware failure, or a BIOS update) which could cause the second drive to become known as /dev/sda,
+potentially causing much woe.
+    As an aside, CMDaemon does offer another way, outside of assertions, to avoid wiping out drive
+data automatically. This is done in cmsh by setting the boolean value of datanode to yes (section 5.4.4).
+
+
+D.12     Example: Using Custom Assertions
+The following example shows the use of the assert tag, which can be added to a device definition:
+
+Example
+D.13 Example: Software RAID1 With One Big Partition                                             925
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:noNamespaceSchemaLocation="schema.xsd">
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <assert name="modelCheck" args="WD800AAJS">
+      <![CDATA[
+        #!/bin/bash
+        if grep -q $1 /sys/block/$ASSERT_DEV/device/model; then
+          exit 0
+        else
+          exit 1
+        fi
+      ]]>
+    </assert>
+
+    <partition id="a1">
+      <size>max</size>
+      <type>linux</type>
+      <filesystem>ext3</filesystem>
+      <mountPoint>/</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+
+  </device>
+  <device>
+    <blockdev>/dev/sdb</blockdev>
+    <vendor>BigRaid</vendor>
+    <requiredSize>2T</requiredSize>
+
+    <partition id="b1">
+      <size>max</size>
+      <type>linux</type>
+      <filesystem>ext3</filesystem>
+      <mountPoint>/data</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+
+  </device>
+</diskSetup>
+
+The assert tag is similar to the vendor and size tags described in section D.11.
+   It can be used to define custom assertions. The assertions can be implemented using any script
+language.
+   The script can access the environment variables ASSERT_DEV (eg: sda) and ASSERT_NODE (eg:
+/dev/sda) during the node-installer stage.
+   Each assert needs to be assigned an arbitrary name and can be passed custom parameters. A non-
+zero exit code in the assertion causes the node-installer to halt.
+
+
+D.13    Example: Software RAID1 With One Big Partition
+The following example shows a head node hard drive that uses one big partition with software RAID 1.
+
+Example
+926                                                   Disk Partitioning And RAID Configuration
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <blockdev>/dev/hda</blockdev>
+    <blockdev>/dev/vda</blockdev>
+    <blockdev>/dev/xvda</blockdev>
+    <blockdev>/dev/cciss/c0d0</blockdev>
+    <blockdev>/dev/nvme0n1</blockdev>
+    <partition id="a0" partitiontype="esp">
+      <size>100M</size>
+      <type>linux</type>
+      <filesystem>fat</filesystem>
+      <mountPoint>/boot/efi</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+    <partition id="a1">
+      <size>1G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="a2">
+      <size>16G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="a3">
+      <size>max</size>
+      <type>linux raid</type>
+    </partition>
+  </device>
+
+  <device>
+    <blockdev>/dev/sdb</blockdev>
+    <blockdev>/dev/hdb</blockdev>
+    <blockdev>/dev/vdb</blockdev>
+    <blockdev>/dev/xvdb</blockdev>
+    <blockdev>/dev/cciss/c0d1</blockdev>
+    <blockdev>/dev/nvme1n1</blockdev>
+    <partition id="b0" partitiontype="esp">
+      <size>100M</size>
+      <type>linux</type>
+      <filesystem>fat</filesystem>
+    </partition>
+    <partition id="b1">
+      <size>1G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="b2">
+      <size>16G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="b3">
+      <size>max</size>
+      <type>linux raid</type>
+    </partition>
+D.14 Example: Software RAID5 With One Big Partition                                             927
+
+  </device>
+
+  <raid id="r1">
+    <member>a1</member>
+    <member>b1</member>
+    <level>1</level>
+    <filesystem>ext2</filesystem>
+    <mountPoint>/boot</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+
+  <raid id="r2">
+    <member>a2</member>
+    <member>b2</member>
+    <level>1</level>
+    <swap/>
+  </raid>
+
+  <raid id="r3">
+    <member>a3</member>
+    <member>b3</member>
+    <level>1</level>
+    <filesystem>__FSTYPE__</filesystem>
+    <mountPoint>/</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+</diskSetup>
+
+
+D.14    Example: Software RAID5 With One Big Partition
+The following example shows a head node hard drive that uses one big partition with software RAID 5.
+
+Example
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <blockdev>/dev/hda</blockdev>
+    <blockdev>/dev/vda</blockdev>
+    <blockdev>/dev/xvda</blockdev>
+    <blockdev>/dev/cciss/c0d0</blockdev>
+    <blockdev>/dev/nvme0n1</blockdev>
+    <partition id="a0" partitiontype="esp">
+      <size>100M</size>
+      <type>linux</type>
+      <filesystem>fat</filesystem>
+      <mountPoint>/boot/efi</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+    <partition id="a1">
+      <size>1G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="a2">
+928                                          Disk Partitioning And RAID Configuration
+
+     <size>16G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="a3">
+     <size>max</size>
+     <type>linux raid</type>
+   </partition>
+ </device>
+
+ <device>
+   <blockdev>/dev/sdb</blockdev>
+   <blockdev>/dev/hdb</blockdev>
+   <blockdev>/dev/vdb</blockdev>
+   <blockdev>/dev/xvdb</blockdev>
+   <blockdev>/dev/cciss/c0d1</blockdev>
+   <blockdev>/dev/nvme1n1</blockdev>
+   <partition id="b0" partitiontype="esp">
+     <size>100M</size>
+     <type>linux</type>
+     <filesystem>fat</filesystem>
+   </partition>
+   <partition id="b1">
+     <size>1G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="b2">
+     <size>16G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="b3">
+     <size>max</size>
+     <type>linux raid</type>
+   </partition>
+ </device>
+
+ <device>
+   <blockdev>/dev/sdc</blockdev>
+   <blockdev>/dev/hdc</blockdev>
+   <blockdev>/dev/vdc</blockdev>
+   <blockdev>/dev/xvdc</blockdev>
+   <blockdev>/dev/cciss/c0d2</blockdev>
+   <blockdev>/dev/nvme2n1</blockdev>
+   <partition id="c0" partitiontype="esp">
+     <size>100M</size>
+     <type>linux</type>
+     <filesystem>fat</filesystem>
+   </partition>
+   <partition id="c1">
+     <size>1G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="c2">
+     <size>16G</size>
+     <type>linux raid</type>
+   </partition>
+D.15 Example: Software RAID1 With Standard Partitioning                                         929
+
+    <partition id="c3">
+      <size>max</size>
+      <type>linux raid</type>
+    </partition>
+  </device>
+
+  <raid id="r1">
+    <member>a1</member>
+    <member>b1</member>
+    <member>c1</member>
+    <level>1</level>
+    <filesystem>ext2</filesystem>
+    <mountPoint>/boot</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+
+  <raid id="r2">
+    <member>a2</member>
+    <member>b2</member>
+    <member>c2</member>
+    <level>5</level>
+    <swap/>
+  </raid>
+
+  <raid id="r3">
+    <member>a3</member>
+    <member>b3</member>
+    <member>c3</member>
+    <level>5</level>
+    <filesystem>__FSTYPE__</filesystem>
+    <mountPoint>/</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+</diskSetup>
+
+
+D.15    Example: Software RAID1 With Standard Partitioning
+The following example shows a head node hard drive that uses the standard partitioning with software
+RAID 1.
+
+Example
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <blockdev>/dev/hda</blockdev>
+    <blockdev>/dev/vda</blockdev>
+    <blockdev>/dev/xvda</blockdev>
+    <blockdev>/dev/cciss/c0d0</blockdev>
+    <blockdev>/dev/nvme0n1</blockdev>
+
+    <partition id="a0" partitiontype="esp">
+      <size>100M</size>
+      <type>linux</type>
+930                                                     Disk Partitioning And RAID Configuration
+
+        <filesystem>fat</filesystem>
+        <mountPoint>/boot/efi</mountPoint>
+        <mountOptions>defaults,noatime,nodiratime</mountOptions>
+      </partition>
+
+      <partition id="a1">
+        <size>1G</size>
+        <type>linux raid</type>
+      </partition>
+
+      <partition id="a2">
+        <size>16G</size>
+        <type>linux raid</type>
+      </partition>
+
+      <partition id="a3">
+        <size>8G</size>
+        <type>linux raid</type>
+      </partition>
+
+      <partition id="a4">
+        <size>30G</size>
+        <type>linux raid</type>
+      </partition>
+
+   <partition id="a5">
+     <size>max</size>
+     <type>linux raid</type>
+   </partition>
+ </device>
+
+ <device>
+   <blockdev>/dev/sdb</blockdev>
+   <blockdev>/dev/hdb</blockdev>
+   <blockdev>/dev/vdb</blockdev>
+   <blockdev>/dev/xvdb</blockdev>
+   <blockdev>/dev/cciss/c0d1</blockdev>
+   <blockdev>/dev/nvme1n1</blockdev>
+
+      <partition id="b0" partitiontype="esp">
+        <size>100M</size>
+        <type>linux</type>
+        <filesystem>fat</filesystem>
+      </partition>
+
+      <partition id="b1">
+        <size>1G</size>
+        <type>linux raid</type>
+      </partition>
+
+      <partition id="b2">
+        <size>16G</size>
+        <type>linux raid</type>
+      </partition>
+D.15 Example: Software RAID1 With Standard Partitioning                    931
+
+   <partition id="b3">
+     <size>8G</size>
+     <type>linux raid</type>
+   </partition>
+
+   <partition id="b4">
+     <size>30G</size>
+     <type>linux raid</type>
+   </partition>
+
+   <partition id="b5">
+     <size>max</size>
+     <type>linux raid</type>
+   </partition>
+ </device>
+
+ <raid id="r1">
+   <member>a1</member>
+   <member>b1</member>
+   <level>1</level>
+   <filesystem>ext2</filesystem>
+   <mountPoint>/boot</mountPoint>
+   <mountOptions>defaults,noatime,nodiratime</mountOptions>
+ </raid>
+
+ <raid id="r2">
+   <member>a2</member>
+   <member>b2</member>
+   <level>1</level>
+   <swap/>
+ </raid>
+
+ <raid id="r3">
+   <member>a3</member>
+   <member>b3</member>
+   <level>1</level>
+   <filesystem>__FSTYPE__</filesystem>
+   <mountPoint>/tmp</mountPoint>
+   <mountOptions>defaults,noatime,nodiratime,nosuid,nodev</mountOptions>
+ </raid>
+
+ <raid id="r4">
+   <member>a4</member>
+   <member>b4</member>
+   <level>1</level>
+   <filesystem>__FSTYPE__</filesystem>
+   <mountPoint>/var</mountPoint>
+   <mountOptions>defaults,noatime,nodiratime</mountOptions>
+ </raid>
+
+ <raid id="r5">
+   <member>a5</member>
+   <member>b5</member>
+   <level>1</level>
+   <filesystem>__FSTYPE__</filesystem>
+932                                                     Disk Partitioning And RAID Configuration
+
+    <mountPoint>/</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+
+</diskSetup>
+
+
+D.16    Example: Software RAID5 With Standard Partitioning
+The following example shows a head node hard drive that uses the standard partitioning with software
+RAID 5.
+
+Example
+
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <device>
+    <blockdev>/dev/sda</blockdev>
+    <blockdev>/dev/hda</blockdev>
+    <blockdev>/dev/vda</blockdev>
+    <blockdev>/dev/xvda</blockdev>
+    <blockdev>/dev/cciss/c0d0</blockdev>
+    <blockdev>/dev/nvme0n1</blockdev>
+    <partition id="a0" partitiontype="esp">
+      <size>100M</size>
+      <type>linux</type>
+      <filesystem>fat</filesystem>
+      <mountPoint>/boot/efi</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+
+    <partition id="a1">
+      <size>1G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="a2">
+      <size>6G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="a3">
+      <size>8G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="a4">
+      <size>30G</size>
+      <type>linux raid</type>
+    </partition>
+    <partition id="a5">
+      <size>max</size>
+      <type>linux raid</type>
+    </partition>
+  </device>
+  <device>
+    <blockdev>/dev/sdb</blockdev>
+    <blockdev>/dev/hdb</blockdev>
+    <blockdev>/dev/vdb</blockdev>
+    <blockdev>/dev/xvdb</blockdev>
+D.16 Example: Software RAID5 With Standard Partitioning   933
+
+   <blockdev>/dev/cciss/c0d1</blockdev>
+   <blockdev>/dev/nvme1n1</blockdev>
+   <partition id="b0" partitiontype="esp">
+     <size>100M</size>
+     <type>linux</type>
+     <filesystem>fat</filesystem>
+   </partition>
+   <partition id="b1">
+     <size>1G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="b2">
+     <size>6G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="b3">
+     <size>8G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="b4">
+     <size>30G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="b5">
+     <size>max</size>
+     <type>linux raid</type>
+   </partition>
+ </device>
+ <device>
+   <blockdev>/dev/sdc</blockdev>
+   <blockdev>/dev/hdc</blockdev>
+   <blockdev>/dev/vdc</blockdev>
+   <blockdev>/dev/xvdc</blockdev>
+   <blockdev>/dev/cciss/c0d2</blockdev>
+   <blockdev>/dev/nvme2n1</blockdev>
+   <partition id="c0" partitiontype="esp">
+     <size>100M</size>
+     <type>linux</type>
+     <filesystem>fat</filesystem>
+   </partition>
+   <partition id="c1">
+     <size>1G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="c2">
+     <size>6G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="c3">
+     <size>8G</size>
+     <type>linux raid</type>
+   </partition>
+   <partition id="c4">
+     <size>30G</size>
+     <type>linux raid</type>
+934                                                   Disk Partitioning And RAID Configuration
+
+    </partition>
+    <partition id="c5">
+      <size>max</size>
+      <type>linux raid</type>
+    </partition>
+  </device>
+  <raid id="r1">
+    <member>a1</member>
+    <member>b1</member>
+    <member>c1</member>
+    <level>1</level>
+    <filesystem>ext2</filesystem>
+    <mountPoint>/boot</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+  <raid id="r2">
+    <member>a2</member>
+    <member>b2</member>
+    <member>c2</member>
+    <level>5</level>
+    <swap/>
+  </raid>
+  <raid id="r3">
+    <member>a3</member>
+    <member>b3</member>
+    <member>c3</member>
+    <level>5</level>
+    <filesystem>__FSTYPE__</filesystem>
+    <mountPoint>/tmp</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime,nosuid,nodev</mountOptions>
+  </raid>
+  <raid id="r4">
+    <member>a4</member>
+    <member>b4</member>
+    <member>c4</member>
+    <level>5</level>
+    <filesystem>__FSTYPE__</filesystem>
+    <mountPoint>/var</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+  <raid id="r5">
+    <member>a5</member>
+    <member>b5</member>
+    <member>c5</member>
+    <level>5</level>
+    <filesystem>__FSTYPE__</filesystem>
+    <mountPoint>/</mountPoint>
+    <mountOptions>defaults,noatime,nodiratime</mountOptions>
+  </raid>
+</diskSetup>
+
+
+D.17   Example: LUKS Disk Encryption With Standard Partitioning
+D.17 Example: LUKS Disk Encryption With Standard Partitioning                                          935
+
+D.17.1 Introduction
+This section considers XML configuration that uses LUKS to set encrypted partitions on a block device.
+Only the non-boot partitions can be encrypted.
+    Encryption can be configured for head and regular nodes during head node installation (section
+3.3.16 of the Installation Manual). For regular nodes it can also be configured later on by modifying the
+XML file used to define disk layouts (section D.17.2).
+    LUKS disk encryption on nodes by default uses a passphrase to decrypt a partition. The passphrase
+processing can be handled automatically, or it can be handled by typing it in manually. These options
+are explained in greater detail next:
+
+   • Automatic passphrase processing: For a node that is configured for encryption, and that is pro-
+     visioned over the network, the passphrase needs to be used to make the encrypted partition ac-
+     cessible. The acceptance of the passphrase for the node needs to be confirmed by the cluster
+     administrator during boot. For security, similar to the familiar case of SSH confirmation for a new
+     first-time connection, the cluster administrator should only confirm acceptance if sure that there is
+     no man-in-the-middle attack.
+     The cluster administrator needs only to confirm the passphrase to make the encrypted partition
+     accessible. Other than confirmation, the cluster administrator does not need to directly manage
+     or even know the passphrase, because the passphrase is stored and managed automatically via
+     CMDaemon.
+
+   • Manual passphrase processing: A node that is not provisioned over the network—that is a node
+     that is configured to boot from its own disk—is called a standalone node. Standalone nodes are
+     generally discouraged in a BCM cluster because they are harder to manage, but there are use
+     cases for them. For example, an edge director (section 2.1.7 of the Edge Manual) is configured as a
+     standalone node by default, because it needs to have a degree of autonomy from the head node.
+     If a standalone node—such as a head node or an edge director that is functioning autonomously—
+     boots from its own drive, it may be that it is configured with an encrypted partition, due to security
+     considerations. With such a configuration, the cluster administrator needs to be able to directly
+     manage the passphrase to allow access to the encrypted partitions. So, after a node is configured
+     to be a standalone node, access to an encrypted partition requires a passphrase to be entered from
+     the console of that node when the node is booting from its drive.
+
+D.17.2   Node Provisioned Over The Network: Encrypted Partition XML Example
+XML Specification For An Encrypted Partition
+The XML example that follows shows encrypted partitions set for a regular node that uses one big par-
+tition and one swap partition. The layout is based on a slightly modified version of the example XML
+file at:
+
+   /cm/local/apps/cmd/etc/htdocs/disk-setup/x86-64-slave-one-big-encrypted-partition-ext4.xml
+
+with minimal <encryption /> tags added for the root and swap partitions that are to run encrypted:
+
+[basecm11->device[node001]]% get disksetup
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<!-- One swap partition and the rest of the filesystem on 1 partition -->
+
+<diskSetup xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <device>
+    <blockdev>/dev/vdb</blockdev>
+
+    <partition id="a0" partitiontype="esp">
+936                                                         Disk Partitioning And RAID Configuration
+
+        <size>100M</size>
+        <type>linux</type>
+        <filesystem>fat</filesystem>
+        <mountPoint>/boot/efi</mountPoint>
+        <mountOptions>defaults,noatime,nodiratime</mountOptions>
+      </partition>
+
+      <partition id="a1">
+        <size>2G</size>
+        <type>linux swap</type>
+        <encryption />
+      </partition>
+
+    <partition id="a2">
+      <size>max</size>
+      <type>linux</type>
+      <encryption />
+      <filesystem>ext4</filesystem>
+      <mountPoint>/</mountPoint>
+      <mountOptions>defaults,noatime,nodiratime</mountOptions>
+    </partition>
+  </device>
+</diskSetup>
+
+   Other XML file examples for encryption can found under /cm/local/apps/cmd/etc/htdocs/disk-setup/,
+with file names that start with the text slave-one-big-encrypted-.
+
+Stages During The Provisioning Of An Encrypted Partition
+After the configuration has been committed, and the node is rebooted, the node pauses during the boot
+process, and waits for approval of the passphrase for that node (figure D.1):
+
+
+
+
+      Figure D.1: Node Console Waiting For Disk Encryption Passphrase During Node-installer Run
+
+    The passphrase is automatically generated and automatically provided by CMDaemon, and CM-
+Daemon at this stage passes on the message that the node is waiting for the disk encryption passphrase.
+    To confirm approval of the passphrase, the installerinteractions command (section 5.4.4) can be
+run. This does not run at a disk level, but at a grouping level (node, category, group, chassis, rack ...).
+Thus, for example, for a node with multiple encrypted disks, it only needs to be confirmed once.
+    If the installerinteractions command is run at node level for a particular node, then it displays
+information about the installer status and interactions.
+    The following shows the output at various stages when a node node001 with the preceding XML
+configuration is booting up:
+
+Example
+D.17 Example: LUKS Disk Encryption With Standard Partitioning                                   937
+
+[basecm11->device[node001]]% installerinteractions
+No remote interactions pending.
+[basecm11->device[node001]]%
+Wed Jun 9 12:32:00 2021 [notice] basecm11: node001 [ INSTALLING ] (node installer started)
+[basecm11->device[node001]]%
+Wed Jun 9 12:32:11 2021 [notice] basecm11: node001 [ INSTALLING ] (waiting for disk encryption passphrase)
+[basecm11->device[node001]]% installerinteractions
+Hostname Category Type                          Timestamp                   Action                Status
+--------- --------- --------------------------- --------------------------- --------------------- --------
+node001 default     disk encryption passphrase Wed Jun 9 12:32:09 2021      Waiting for approval pending
+
+   To confirm the approval, the installerinteractions command can be run with the --confirm
+option and the -w|--write option:
+
+Example
+
+[basecm11->device[node001]]% installerinteractions -w --confirm
+[basecm11->device[node001]]% installerinteractions
+Hostname Category Type                          Timestamp                   Action                Status
+--------- --------- --------------------------- --------------------------- --------------------- ---------
+node001 default     disk encryption passphrase Wed Jun 9 12:35:22 2021      Waiting for approval confirmed
+
+[... after some time...]
+
+[basecm11->device[node001]]% installerinteractions
+No remote interactions pending.
+
+   If the -w|--write option is not used, then the command is a dry-run, which means it only pretends
+to write changes.
+   More options for installerinteractions can be seen by running help installerinteractions.
+
+Allowing Passphrase Confirmation (To Make An Encrypted Partition Accessible) Until A Future Time
+The installerinteractions confirmation can be done for a specified time in advance with:
+
+Example
+
+[basecm11->device[node001]]% installerinteractions -w --confirm --for 5m
+[basecm11->device[node001]]% installerinteractions
+Hostname Category Type                          Timestamp                        Action         Status
+--------- --------- --------------------------- -------------------------------- -------------- ----------
+node001 default     disk encryption passphrase Thu Jun 10 16:53:46 2021          Future action confirmed
+[basecm11->device[node001]]% reboot
+
+     Possible units that can be used to specify the time period are:
+
+ Unit     Meaning
+ s        seconds
+ m        minutes
+ h        hours
+ d        days
+ w        weeks
+938                                                          Disk Partitioning And RAID Configuration
+
+Passphrase Change And Provisioning Mode Considerations
+If the passphrase is changed, then the node-installer carries out a FULL install (section 5.4.4).
+    If the confirmation timestamp is set for the future, and
+
+   1. if the node passphrase is changed before the time of the timestamp, then the node-installer carries
+      out a FULL install too.
+
+   2. if the node reboots and reaches the passphrase confirmation state after the time of the timestamp,
+      then the node-installer cannot carry out a FULL install too, until a fresh installerinteractions
+      confirmation is done.
+
+   When the FULL install is carried out, the node-installer arranges that the encrypted partitions are
+provisioned as specified by the XML file, and the node eventually gets to a fully running stage. This
+happens just as with a regular node, but with the XML encryption tags ensuring that the specified
+partitions are encrypted.
+
+Viewing Disk Partitions And Cipher String Used With The diskpartitions Command
+Once the node is fully running, information about the partition state can be viewed with the
+diskpartitions command:
+
+Example
+
+[basecm11->device[node001]]% diskpartitions
+Node     Name     Major    Minor    Blocks      Cipher string    Devices Device mapper
+-------- -------- -------- -------- ----------- ---------------- -------- -------------
+...
+node001 vdb       253      16       52,428,800
+node001 vdb1      253      17       102,400
+node001 vdb2      253      18       2,097,152 aes-xts-plain64
+node001 vdb3      253      19       50,225,152 aes-xts-plain64
+
+LUKS Encryption Defaults
+The <encryption /> tag is quite minimal and implies defaults. Its schema is outlined in section D.1. An
+expanded example of how LUKS options can be set in the encryption section of the XML file is:
+
+Example
+
+<encryption>
+    <type>luks2</type>
+    <cipher>aes-xts-plain64</cipher>
+    <hash>sha256</hash>
+    <keySize>256</keySize>
+    <name>root</name>
+    <allowDiscards />
+    <custom>--key-slot=2</custom>
+</encryption>
+
+D.17.3 Standalone Node: Encrypted Partition XML Example
+Nodes are not managed by CMDaemon while in a standalone state. The automated passing of a
+passphrase by CMDaemon to decrypt the LUKS disk encryption can therefore not take place for stan-
+dalone nodes. The passphrase must thus be executed directly by the cluster administrator, either at the
+console, or after re-establishing CMDaemon connectivity.
+    A new passphrase can be set for the node while it is still managed by CMDaemon, and automat-
+ically overwrites the CMDaemon-managed passphrase. The new passphrase can be defined with the
+--passphrase or with the -p|--payload <payload> option of installerinteractions, and needs the
+--force option:
+D.17 Example: LUKS Disk Encryption With Standard Partitioning                                           939
+
+Example
+
+Fri Jun 11 23:08:38 2021 [notice] basecm11: node001 [ INSTALLING ] (waiting for disk encryption passphrase)
+[basecm11->device[node001]]% installerinteractions -w -p mysecret --confirm --force
+Hostname Category Type                          Timestamp                   Action                Status
+--------- --------- --------------------------- --------------------------- --------------------- ----------
+node001 default     disk encryption passphrase Fri Jun 11 23:08:36 2021     Waiting for approval pending
+[...time passes...]
+[basecm11->device[node001]]% installerinteractions
+No remote interactions pending.
+[basecm11->device[node001]]%
+Fri Jun 11 23:09:48 2021 [notice] basecm11: node001 [ INSTALLER_CALLINGINIT ] (switching to local root)
+[basecm11->device[node001]]%
+Fri Jun 11 23:10:31 2021 [notice] basecm11: node001 [ UP     ]
+[basecm11->device[node001]]%
+
+    The reason for the --force option is that changing the passphrase results in the entire disk being
+reformatted.
+    Setting a new passphrase means that the node undergoes a FULL installation (section 5.4.4) during
+node provisioning. However for a standalone mode, the provisioning system is bypassed in favor of
+booting from the local drive, and the passphrase must be entered manually at the node console.
+
+D.17.4 Changing A Passphrase On An Encrypted Node
+Passphrases can be of two types:
+
+   • autorandom: An automatically-generated random passphrase, 256 characters in length
+
+   • custom: A manually-generated passphrase that is typed in by the cluster administrator. This
+     passphrase is set up when using the
+
+     installerinteractions --confirm -w
+
+     command with either the option
+
+           -p|--payload <payload>
+           or the option
+           --passphrase
+
+    If a node with an autorandom passphrase type is confirmed with -p|--payload or --passphrase, then
+the passphrase type automatically switches to a custom passphrase type. The passphrase during this
+confirmation is set either as the payload (the <payload> part) of the -p|--payload option, or it is set as a
+string entered via the prompts that come up when the --passphrase option is used.
+    If echoing of the passphrase to processes viewing utilities is a risk, then it is recommended to use the
+prompting option, --passphrase, instead of the -p|--payload option.
+    Any passphrase change results in a FULL installation during node-installer provisioning.
+
+Resetting A Passphrase Type To autorandom
+To reset a node that is being managed with a custom type passphrase back to the autorandom type
+of passphrase, so that the passphrase is managed by CMDaemon management, the --reset option of
+installerinteractions can be used:
+
+[basecm11->device[node001]]% installerinteractions -w --reset --confirm
